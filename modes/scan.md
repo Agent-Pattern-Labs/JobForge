@@ -38,6 +38,8 @@ Read `portals.yml` which contains:
 
 For companies using an ATS or aggregator that exposes a public JSON/RSS API, fetch structured data directly. APIs are faster than Geometra and harder to hallucinate (the response is load-bearing — record IDs verbatim from the response, never reconstruct them). Use as a complement to Level 1.
 
+**OpenCode WebFetch compatibility:** when fetching JSON/RSS API endpoints, do not pass `format: "json"`. OpenCode accepts `text`, `markdown`, or `html`; omit `format` or use `format: "text"` and parse JSON/RSS from the returned body.
+
 Supported API shapes:
 
 #### Greenhouse (JSON, per-company board)
