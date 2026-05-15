@@ -100,7 +100,7 @@ Some forks use a **single** `data/applications.md` instead. That is fine if you 
 
 To inspect real agent sessions locally (tool mix, redundant fetches, Geometra churn) without uploading transcripts, use the `job-forge trace:*` commands. JobForge depends on Razroo's [`@razroo/iso-trace`](https://github.com/razroo/iso/tree/main/packages/iso-trace), so consumer projects do not need to install it separately.
 
-Common commands default to OpenCode sessions for the current project and use a 7-day window:
+Common commands default to sessions for the current project and use a 7-day window:
 
 ```bash
 npx job-forge trace:list
@@ -114,7 +114,7 @@ For raw iso-trace commands, use `npx job-forge trace sources`, `npx job-forge tr
 
 ## JobForge telemetry
 
-Trace is the raw transcript view. Telemetry is the JobForge operational view: it summarizes task dispatches, child session outcomes, provider errors, policy issues, and pending tracker TSVs.
+Trace is the raw transcript view. Telemetry is the JobForge operational view: it summarizes dispatches, child session outcomes, provider errors, policy issues, and pending tracker TSVs.
 
 ```bash
 npx job-forge telemetry:list
@@ -123,7 +123,7 @@ npx job-forge telemetry:show <session-id-or-prefix>
 npx job-forge telemetry:watch
 ```
 
-Telemetry is also local-only and passive. It reads OpenCode's SQLite DB and files under `batch/tracker-additions/`; agents do not need to remember to emit custom events.
+Telemetry is also local-only and passive. It reads normalized local harness traces plus files under `batch/tracker-additions/`; agents do not need to remember to emit custom events.
 
 ## JobForge ledger
 
@@ -196,7 +196,7 @@ Consumer-project migrations live in `templates/migrations.json` and are applied 
 
 ## JobForge guard audits
 
-Guard audits run deterministic `@razroo/iso-guard` policies over the same local OpenCode traces. The default policy lives at `templates/guards/jobforge-baseline.yaml` and checks rules that are reliable from transcript data, including max two task dispatches per assistant message, no task-status polling via `task`, no raw proxy configuration in task prompts, and no child session task recursion.
+Guard audits run deterministic `@razroo/iso-guard` policies over the same local traces. The default policy lives at `templates/guards/jobforge-baseline.yaml` and checks rules that are reliable from transcript data, including max two OpenCode `task` dispatches per assistant message, no task-status polling via `task`, no raw proxy configuration in task prompts, and no child session task recursion.
 
 ```bash
 npx job-forge guard:audit
@@ -204,13 +204,13 @@ npx job-forge guard:audit <session-id-or-prefix>
 npx job-forge guard:explain
 ```
 
-Use `--policy <path>` to audit with a custom policy. This does not add prompt, token, or MCP overhead; JobForge converts local trace rows into guard events inside the CLI process.
+Use `--policy <path>` to audit with a custom policy. This does not add prompt, token, or MCP overhead; JobForge converts local normalized trace events into guard events inside the CLI process.
 
 **Where Claude Code writes JSONL:** `~/.claude/projects/<encoded-cwd>/*.jsonl`.
 
 **Direct CLI fallback:** `npx -y @razroo/iso-trace@latest stats --source "$HOME/.claude/projects/<encoded-dir>/<session>.jsonl"`
 
-**Performance:** `iso-trace list --cwd /path/to/repo` walks all of `~/.claude/projects` before filtering; on large machines prefer `stats --source <one.jsonl>` or the library's `discoverSessions({ roots: ["<one encoded project dir>"] })` (see the iso-trace README).
+**Performance:** JobForge narrows discovery to project-local roots where possible, but raw `iso-trace list --cwd /path/to/repo` may still walk large transcript trees on busy machines. Prefer `stats --source <one.jsonl>` or project-scoped roots when you need direct `iso-trace` usage.
 
 ## States (templates/states.yml)
 

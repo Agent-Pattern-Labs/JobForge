@@ -224,12 +224,15 @@ const opencodeCfg = {
   // Files listed here load into every session's cached prefix, so they're
   // cached once (on Anthropic) instead of Read-as-tool-call on every session.
   //   AGENTS.harness.md → symlink to node_modules/job-forge/AGENTS.md (harness rules)
+  //   .opencode/instructions.md → symlink to node_modules/job-forge/.opencode/instructions.md
+  //                              (OpenCode-only harness addendum)
   //   modes/_shared.md  → symlink into node_modules; canonical scoring model
   //   cv.md             → candidate's CV (personal, created during onboarding)
   //   templates/states.yml → canonical application states (validated by merge-tracker.mjs)
   // Ordering matters for cache prefix stability: put most-stable files first.
   instructions: [
     'AGENTS.harness.md',
+    '.opencode/instructions.md',
     'templates/states.yml',
     'modes/_shared.md',
     'cv.md',
@@ -285,7 +288,7 @@ write('AGENTS.md', `# AGENTS — ${name}
 
 Personal job search project using the [job-forge](https://github.com/razroo/JobForge) harness. The harness lives in \`node_modules/job-forge/\`; most files you need are accessible through symlinks at the project root.
 
-**How context loads in this project:** opencode auto-loads *this* file as the project-root AGENTS.md, and also loads \`AGENTS.harness.md\` via \`opencode.json:instructions\` — that second file is a symlink to \`node_modules/job-forge/AGENTS.md\` and carries the shared operational rules (Session Hygiene, OTP handling, batch best practices, scoring). Keep *this* file for personal overrides — anything you want to diverge from or add on top.
+**How context loads in this project:** opencode auto-loads *this* file as the project-root AGENTS.md, then loads \`AGENTS.harness.md\` plus \`.opencode/instructions.md\` via \`opencode.json:instructions\`. \`AGENTS.harness.md\` is the shared cross-harness contract; \`.opencode/instructions.md\` is reserved for OpenCode-only addenda. Keep *this* file for personal overrides — anything you want to diverge from or add on top.
 
 ---
 

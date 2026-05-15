@@ -8,6 +8,7 @@
  *   - idempotent bundle execution keyed by URL + retry count
  *   - bounded fan-out through workflow.forEach(..., { maxParallel })
  *   - mutexed state/report-number writes across parallel workers
+ *   - renewable leases + heartbeats for worker liveness inspection
  */
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -46,12 +47,13 @@ const DEFAULT_WORKFLOW_ID = 'jobforge-batch';
 const STATE_HEADER = 'id\turl\tstatus\tstarted_at\tcompleted_at\treport_num\tscore\terror\tretries';
 
 function usage() {
-  console.log(`job-forge batch runner - process job offers in batch via opencode run workers
-Uses your default opencode model.
+  console.log(`job-forge batch runner - process job offers in batch via AI CLI workers
+Uses the selected runner's default project configuration.
 
 Usage: batch-runner.sh [OPTIONS]
 
 Options:
+  --runner NAME        Worker CLI: opencode or codex (default: ${process.env.JOBFORGE_BATCH_RUNNER || 'opencode'})
   --parallel N         Number of parallel workers (default: 1)
   --bundle-size N      Offers per worker invocation (default: 5, use 1 for
                        legacy per-offer mode). Each worker processes N
@@ -74,6 +76,7 @@ Files:
 
 function parseArgs(argv) {
   const options = {
+    runner: parseRunner(process.env.JOBFORGE_BATCH_RUNNER || 'opencode'),
     parallel: 1,
     dryRun: false,
     retryFailed: false,
@@ -94,6 +97,9 @@ function parseArgs(argv) {
     };
 
     switch (arg) {
+      case '--runner':
+        options.runner = parseRunner(next());
+        break;
       case '--parallel':
         options.parallel = parsePositiveInt(next(), '--parallel');
         break;
@@ -126,6 +132,12 @@ function parseArgs(argv) {
   }
 
   return options;
+}
+
+function parseRunner(value) {
+  const runner = String(value || '').trim().toLowerCase();
+  if (runner === 'opencode' || runner === 'codex') return runner;
+  throw new Error(`--runner must be one of: opencode, codex`);
 }
 
 function parsePositiveInt(value, label) {
@@ -180,7 +192,7 @@ async function readTextIfExists(path) {
   return readFile(path, 'utf8');
 }
 
-async function checkPrerequisites({ dryRun }) {
+async function checkPrerequisites({ dryRun, runner }) {
   if (!existsSync(INPUT_FILE)) {
     throw new Error(`${INPUT_FILE} not found. Add offers first.`);
   }
@@ -188,9 +200,10 @@ async function checkPrerequisites({ dryRun }) {
     throw new Error(`${PROMPT_FILE} not found.`);
   }
   if (!dryRun) {
-    const result = spawnSync('opencode', ['--help'], { stdio: 'ignore' });
+    const command = workerCommandName(runner);
+    const result = spawnSync(command, ['--help'], { stdio: 'ignore' });
     if (result.error?.code === 'ENOENT') {
-      throw new Error("'opencode' CLI not found in PATH.");
+      throw new Error(`'${command}' CLI not found in PATH.`);
     }
   }
 
@@ -531,6 +544,70 @@ async function runOpencode(prompt, logFile) {
   });
 }
 
+let batchTemplateCache;
+
+async function batchTemplateText() {
+  if (batchTemplateCache === undefined) {
+    batchTemplateCache = await readFile(PROMPT_FILE, 'utf8');
+  }
+  return batchTemplateCache;
+}
+
+function workerCommandName(runner) {
+  return runner === 'codex' ? 'codex' : 'opencode';
+}
+
+async function runCodex(prompt, logFile) {
+  await ensureDir(dirname(logFile));
+  const finalMessageFile = `${logFile}.last-message.txt`;
+  const combinedPrompt = `${(await batchTemplateText()).trim()}\n\n${prompt}`;
+
+  return new Promise((resolveRun) => {
+    const child = spawn('codex', [
+      'exec',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '-C',
+      PROJECT_DIR,
+      '--output-last-message',
+      finalMessageFile,
+      combinedPrompt,
+    ], {
+      cwd: PROJECT_DIR,
+      env: {
+        ...process.env,
+        JOB_FORGE_PROJECT: PROJECT_DIR,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    const chunks = [];
+    child.stdout.on('data', (chunk) => chunks.push(chunk));
+    child.stderr.on('data', (chunk) => chunks.push(chunk));
+
+    child.on('error', async (error) => {
+      chunks.push(Buffer.from(`\n${error.stack || error.message}\n`));
+    });
+
+    child.on('close', async (code) => {
+      const output = Buffer.concat(chunks).toString('utf8');
+      const finalMessage = await readTextIfExists(finalMessageFile);
+      const logOutput = finalMessage
+        ? `${output}\n\n--- FINAL MESSAGE ---\n${finalMessage}`
+        : output;
+      await writeFile(logFile, logOutput, 'utf8');
+      resolveRun({
+        exitCode: code ?? 1,
+        output: finalMessage || output,
+      });
+    });
+  });
+}
+
+async function runWorker(runner, prompt, logFile) {
+  if (runner === 'codex') return runCodex(prompt, logFile);
+  return runOpencode(prompt, logFile);
+}
+
 function parseStatusLines(output) {
   const seen = new Map();
   for (const line of output.split('\n')) {
@@ -550,7 +627,57 @@ function parseStatusLines(output) {
   return seen;
 }
 
-async function processBundle(workflow, bundle) {
+async function withWorkerLiveness(workflow, { runner, tag, ids, logFile }, run) {
+  const leaseKey = `worker:${tag}`;
+  const holder = `${runner}:${process.pid}:${tag}`;
+  const detail = {
+    runner,
+    ids,
+    log: relativeProjectPath(logFile),
+  };
+
+  await workflow.touchLease(leaseKey, {
+    holder,
+    ttlMs: 120_000,
+    detail: {
+      ...detail,
+      phase: 'starting',
+    },
+  });
+  await workflow.heartbeat(leaseKey, {
+    ...detail,
+    phase: 'starting',
+  });
+
+  const timer = setInterval(() => {
+    workflow.touchLease(leaseKey, {
+      holder,
+      ttlMs: 120_000,
+      detail: {
+        ...detail,
+        phase: 'running',
+      },
+    }).catch(() => {});
+    workflow.heartbeat(leaseKey, {
+      ...detail,
+      phase: 'running',
+    }).catch(() => {});
+  }, 30_000);
+  timer.unref?.();
+
+  try {
+    return await run();
+  } finally {
+    clearInterval(timer);
+    await workflow.heartbeat(leaseKey, {
+      ...detail,
+      phase: 'finished',
+    }).catch(() => {});
+    await workflow.releaseLease(leaseKey, holder).catch(() => {});
+  }
+}
+
+async function processBundle(workflow, bundle, options) {
   const startedAt = nowIso();
   const specs = await reserveBundle(workflow, bundle, startedAt);
   const tag = bundleTag(bundle);
@@ -561,11 +688,17 @@ async function processBundle(workflow, bundle) {
     type: 'batch.bundle.started',
     detail: {
       ids: bundle.map((offer) => offer.id),
+      runner: options.runner,
       log: relativeProjectPath(logFile),
     },
   });
 
-  const { exitCode, output } = await runOpencode(buildBundlePrompt(specs), logFile);
+  const { exitCode, output } = await withWorkerLiveness(workflow, {
+    runner: options.runner,
+    tag,
+    ids: bundle.map((offer) => offer.id),
+    logFile,
+  }, () => runWorker(options.runner, buildBundlePrompt(specs), logFile));
   const completedAt = nowIso();
   const statuses = parseStatusLines(output);
   const outcomes = [];
@@ -598,6 +731,13 @@ async function processBundle(workflow, bundle) {
         score: sanitizeCell(score),
         report_num: sanitizeCell(parsed.report_num, spec.report_num),
       });
+      await workflow.heartbeat(`worker:${tag}`, {
+        runner: options.runner,
+        ids: bundle.map((candidate) => candidate.id),
+        offerId: spec.id,
+        phase: 'settling',
+        status,
+      }).catch(() => {});
       console.log(`    ${status === 'completed' ? 'OK' : 'FAIL'} #${spec.id} (status=${status}, score=${sanitizeCell(score)}, report=${sanitizeCell(parsed.report_num, spec.report_num)})`);
       continue;
     }
@@ -622,6 +762,13 @@ async function processBundle(workflow, bundle) {
       score: '-',
       report_num: spec.report_num,
     });
+    await workflow.heartbeat(`worker:${tag}`, {
+      runner: options.runner,
+      ids: bundle.map((candidate) => candidate.id),
+      offerId: spec.id,
+      phase: 'settling',
+      status: 'failed',
+    }).catch(() => {});
     console.log(`    FAIL #${spec.id} (no status emitted; see ${relativeProjectPath(logFile)})`);
   }
 
@@ -633,6 +780,7 @@ async function processBundle(workflow, bundle) {
     type: 'batch.bundle.completed',
     detail: {
       ids: bundle.map((offer) => offer.id),
+      runner: options.runner,
       exitCode,
       log: relativeProjectPath(logFile),
       outcomes,
@@ -766,7 +914,7 @@ async function run(options) {
     const pending = selectPendingOffers(offers, stateRows, options);
 
     console.log('=== job-forge batch runner ===');
-    console.log(`Parallel: ${options.parallel} | Bundle size: ${options.bundleSize} | Max retries: ${options.maxRetries}`);
+    console.log(`Runner: ${options.runner} | Parallel: ${options.parallel} | Bundle size: ${options.bundleSize} | Max retries: ${options.maxRetries}`);
     console.log(`Workflow: ${options.workflowId} (${relativeProjectPath(WORKFLOW_DIR)})`);
     console.log(`Input: ${totalInput} offers`);
     console.log('');
@@ -812,6 +960,7 @@ async function run(options) {
             totalInput,
             pending: pending.length,
             bundles: bundles.length,
+            runner: options.runner,
             parallel: options.parallel,
             bundleSize: options.bundleSize,
           },
@@ -824,7 +973,7 @@ async function run(options) {
             const stepName = bundleStepName(bundle, rowsBeforeRun);
             return workflow.step(
               stepName,
-              async () => processBundle(workflow, bundle),
+              async () => processBundle(workflow, bundle, options),
               {
                 idempotencyKey: stepName,
               },

@@ -1,29 +1,58 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'child_process';
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
-import { defaultOpenCodeDbPath, findSessionById, parseSinceCutoff } from '@razroo/iso-trace';
+import {
+  buildSessionGraph,
+  clean,
+  collectDispatchCalls,
+  descendantIds,
+  discoverProjectSessions,
+  duplicateDispatchUrlCount,
+  findObservedSession,
+  hasOutcome,
+  hasProxyLeak,
+  inspectionForSession,
+  isFreeModelRoute,
+  mentionsLimitedCandidatePool,
+  mergeModelUsage,
+  messageEvents,
+  modelLabel,
+  modelUsageFromSession,
+  outcomeFromText,
+  pad,
+  providerErrorsForSession,
+  providerErrorCategory,
+  redactSecrets,
+  relativeToProject,
+  requestedJobCount,
+  shorten,
+  statusCodeFromText,
+  stringValue,
+  summarizeChildSession,
+  userRequestSummaries,
+  loadObservedSession,
+} from '../lib/jobforge-observability.mjs';
 import { jobForgeLedgerSummary } from '../lib/jobforge-ledger.mjs';
 
 const PROJECT_DIR = process.env.JOB_FORGE_PROJECT || process.cwd();
 const DEFAULT_SINCE = '24h';
 
-const USAGE = `job-forge telemetry — JobForge pipeline view over local OpenCode traces
+const USAGE = `job-forge telemetry — JobForge pipeline view over local traces
 
 Usage:
-  job-forge telemetry:list [--since 24h] [--cwd <dir>] [--json]
-  job-forge telemetry:status [--since 24h] [--cwd <dir>] [--json]
-  job-forge telemetry:show <id-or-prefix> [--cwd <dir>] [--json]
-  job-forge telemetry:watch [--since 24h] [--cwd <dir>] [--interval 5]
+  job-forge telemetry:list [--since 24h] [--cwd <dir>] [--harness <name>] [--json]
+  job-forge telemetry:status [--since 24h] [--cwd <dir>] [--harness <name>] [--json]
+  job-forge telemetry:show <id-or-prefix> [--cwd <dir>] [--harness <name>] [--json]
+  job-forge telemetry:watch [--since 24h] [--cwd <dir>] [--harness <name>] [--interval 5]
 
-Telemetry is local-only and passive. It derives status from OpenCode's SQLite DB
-plus JobForge tracker files; agents do not need to emit custom events.`;
+Telemetry is local-only and passive. It derives status from normalized local
+traces plus JobForge tracker files; agents do not need to emit custom events.`;
 
 const [cmd = 'help', ...args] = process.argv.slice(2);
 
 function parseArgs(rawArgs, { allowSession = false, allowInterval = false } = {}) {
-  const opts = { since: DEFAULT_SINCE, cwd: PROJECT_DIR, json: false, interval: 5 };
+  const opts = { since: DEFAULT_SINCE, cwd: PROJECT_DIR, harness: '', json: false, interval: 5 };
   const positional = [];
 
   for (let i = 0; i < rawArgs.length; i++) {
@@ -36,6 +65,10 @@ function parseArgs(rawArgs, { allowSession = false, allowInterval = false } = {}
       opts.cwd = rawArgs[++i];
     } else if (arg.startsWith('--cwd=')) {
       opts.cwd = arg.slice('--cwd='.length);
+    } else if (arg === '--harness') {
+      opts.harness = rawArgs[++i];
+    } else if (arg.startsWith('--harness=')) {
+      opts.harness = arg.slice('--harness='.length);
     } else if (arg === '--json') {
       opts.json = true;
     } else if (allowInterval && arg === '--interval') {
@@ -58,146 +91,122 @@ function parseArgs(rawArgs, { allowSession = false, allowInterval = false } = {}
   return { opts, positional };
 }
 
-function queryOpenCodeDb(dbPath, sql) {
-  const result = spawnSync('sqlite3', ['-json', dbPath, sql], {
-    encoding: 'utf8',
-    maxBuffer: 24 * 1024 * 1024,
-  });
-  if ((result.status ?? 0) !== 0) {
-    const detail = result.stderr?.trim() || result.stdout?.trim() || `exit ${result.status ?? 1}`;
-    throw new Error(`job-forge telemetry: sqlite3 query failed: ${detail}`);
+function rootRefs(refs, graph) {
+  return graph.roots.length > 0 ? graph.roots : refs;
+}
+
+function loadContext(refs) {
+  const sessionsById = new Map();
+  const loadErrors = new Map();
+  for (const ref of refs) {
+    try {
+      sessionsById.set(ref.id, loadObservedSession(ref));
+    } catch (error) {
+      loadErrors.set(ref.id, error instanceof Error ? error.message : String(error));
+    }
   }
-  return JSON.parse(result.stdout || '[]');
+  const loadedRefs = refs.filter((ref) => sessionsById.has(ref.id));
+  const graph = buildSessionGraph(loadedRefs, sessionsById);
+  const refsById = new Map(refs.map((ref) => [ref.id, ref]));
+  return { refsById, sessionsById, graph, loadedRefs, loadErrors };
 }
 
-function sqlString(value) {
-  return `'${String(value).replaceAll("'", "''")}'`;
-}
-
-function msToIso(ms) {
-  return new Date(Number(ms)).toISOString();
-}
-
-function discoverSessions(opts, { includeAllForShow = false } = {}) {
-  const dbPath = defaultOpenCodeDbPath();
-  if (!existsSync(dbPath)) return [];
-
-  const where = [
-    's.time_archived is null',
-    `s.directory = ${sqlString(opts.cwd)}`,
-  ];
-  const sinceMs = includeAllForShow ? undefined : parseSinceCutoff(opts.since);
-  if (sinceMs !== undefined) where.push(`s.time_created >= ${Number(sinceMs)}`);
-
-  const rows = queryOpenCodeDb(dbPath, [
-    'select',
-    '  s.id,',
-    '  s.parent_id,',
-    '  s.title,',
-    '  s.directory,',
-    '  s.time_created,',
-    '  s.time_updated,',
-    '  (select count(*) from message m where m.session_id = s.id) as turn_count,',
-    '  (',
-    '    (select coalesce(sum(length(data)), 0) from message m where m.session_id = s.id) +',
-    '    (select coalesce(sum(length(data)), 0) from part p where p.session_id = s.id)',
-    '  ) as size_bytes',
-    'from session s',
-    `where ${where.join(' and ')}`,
-    'order by s.time_updated desc',
-  ].join(' '));
-
-  return rows.map((row) => ({
-    id: row.id,
-    parentId: row.parent_id || null,
-    title: row.title || '',
-    cwd: row.directory,
-    startedAt: msToIso(row.time_created),
-    endedAt: msToIso(row.time_updated),
-    turnCount: row.turn_count ?? 0,
-    sizeBytes: row.size_bytes ?? 0,
-  }));
-}
-
-function loadRows(sessionId) {
-  const dbPath = defaultOpenCodeDbPath();
-  const id = sqlString(sessionId);
-  return {
-    messages: queryOpenCodeDb(dbPath, `select id, time_created, data from message where session_id = ${id} order by time_created, id`),
-    parts: queryOpenCodeDb(dbPath, `select id, message_id, time_created, data from part where session_id = ${id} order by time_created, id`),
-  };
-}
-
-function parseJson(raw) {
-  try {
-    return JSON.parse(raw || '{}');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { __parseError: message, __raw: raw || '' };
-  }
-}
-
-function analyzeSession(session, allSessions, opts) {
-  const rows = loadRows(session.id);
-  const messages = rows.messages.map((row) => ({ row, data: parseJson(row.data) }));
-  const parts = rows.parts.map((row) => ({ row, data: parseJson(row.data) }));
-  const messageById = new Map(messages.map((m) => [m.row.id, m.data]));
-  const textParts = parts.filter((p) => p.data.type === 'text');
-  const taskCalls = parts.filter((p) => p.data.type === 'tool' && p.data.tool === 'task').map(taskCallSummary);
-  const userRequests = userRequestSummaries(textParts, messageById);
+function analyzeSession(ref, context, opts) {
+  const session = context.sessionsById.get(ref.id);
+  const inspection = inspectionForSession(session);
+  const userRequests = userRequestSummaries(session);
   const activeRequest = userRequests.at(-1) || null;
-  const userPrompt = activeRequest?.prompt || userRequests[0]?.prompt || '';
-  const latestTaskCalls = activeRequest
-    ? taskCalls.filter((task) => task.atMs >= activeRequest.atMs)
-    : taskCalls;
-  const providerErrors = messages.map(providerErrorSummary).filter(Boolean);
-  const rootModels = modelUsageFromMessages(messages);
+  const prompt = activeRequest?.prompt || userRequests[0]?.prompt || inspection.preview.firstUser || '';
+  const dispatchCalls = collectDispatchCalls(session);
+  const latestDispatchCalls = activeRequest
+    ? dispatchCalls.filter((call) => call.atMs >= activeRequest.atMs)
+    : dispatchCalls;
+  const providerErrors = providerErrorsForSession(session);
+  const rootModels = modelUsageFromSession(session);
   const tracker = trackerStatus(opts.cwd);
-  const children = allSessions
-    .filter((candidate) => candidate.parentId === session.id)
-    .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
-    .map((child) => childSummary(child));
+
+  const childRefs = (context.graph.childrenBySession.get(ref.id) || [])
+    .map((id) => context.refsById.get(id))
+    .filter(Boolean)
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  const children = childRefs
+    .map((childRef) => summarizeChildSession(context.sessionsById.get(childRef.id)))
+    .filter(Boolean);
   const latestChildren = activeRequest
     ? children.filter((child) => child.startedAtMs >= activeRequest.atMs)
     : children;
   const models = mergeModelUsage([rootModels, ...children.map((child) => child.models)]);
-  const policyIssues = detectPolicyIssues(session, parts, textParts, messageById, providerErrors, {
-    taskCalls,
-    latestTaskCalls,
+  const unresolvedChildren = dispatchCalls.filter((call) => call.sessionId && !children.find((child) => child.id === call.sessionId));
+  const policyIssues = detectPolicyIssues(ref, session, providerErrors, {
+    dispatchCalls,
+    latestDispatchCalls,
     children,
     latestChildren,
+    unresolvedChildren,
     activeRequest,
     models,
+    inspection,
+    isChildSession: context.graph.childIds.has(ref.id),
   });
+
   const childOutcomes = children.filter((child) => child.outcome !== 'unknown').length;
   const childProviderErrors = children.reduce((sum, child) => sum + child.providerErrors, 0);
-  const status = sessionStatus({ session, taskCalls, children, childOutcomes, childProviderErrors, policyIssues, providerErrors });
-  const recommendations = nextActions({ tracker, policyIssues, providerErrors, taskCalls, children });
+  const status = sessionStatus({
+    dispatchCalls,
+    children,
+    unresolvedChildren,
+    childOutcomes,
+    childProviderErrors,
+    policyIssues,
+    providerErrors,
+  });
+  const recommendations = nextActions({ tracker, policyIssues, providerErrors, dispatchCalls, children });
 
   return {
-    session,
+    session: {
+      id: ref.id,
+      harness: ref.source.harness,
+      title: ref.title || session.title || '',
+      startedAt: ref.startedAt,
+      endedAt: ref.endedAt,
+    },
     projectDir: opts.cwd,
     status,
-    prompt: userPrompt,
+    prompt,
     userRequests,
     latestRequest: activeRequest ? {
       ...activeRequest,
-      taskDispatches: latestTaskCalls.filter((task) => !task.isStatusPoll).length,
+      taskDispatches: latestDispatchCalls.filter((call) => !call.isStatusPoll).length,
       children: latestChildren.length,
       childOutcomes: latestChildren.filter((child) => child.outcome !== 'unknown').length,
     } : null,
     tasks: {
-      total: taskCalls.length,
-      statusPolls: taskCalls.filter((task) => task.isStatusPoll).length,
-      running: taskCalls.filter((task) => task.status && task.status !== 'completed').length,
-      calls: taskCalls,
+      total: dispatchCalls.length,
+      statusPolls: dispatchCalls.filter((call) => call.isStatusPoll).length,
+      running: children.filter((child) => child.outcome === 'unknown').length + unresolvedChildren.length,
+      calls: dispatchCalls,
     },
     children: {
-      total: children.length,
+      total: children.length + unresolvedChildren.length,
       withOutcomes: childOutcomes,
       providerErrors: childProviderErrors,
       toolErrors: children.reduce((sum, child) => sum + child.toolErrors, 0),
-      sessions: children,
+      sessions: [
+        ...children,
+        ...unresolvedChildren.map((call) => ({
+          id: call.sessionId,
+          title: call.description || '',
+          startedAt: call.at,
+          outcome: 'unknown',
+          providerErrors: 0,
+          taskCalls: 0,
+          dispatchCalls: 0,
+          toolErrors: 0,
+          dedupeMiss: false,
+          trackerWrites: 0,
+          models: [],
+        })),
+      ],
     },
     models,
     providerErrors,
@@ -207,80 +216,32 @@ function analyzeSession(session, allSessions, opts) {
   };
 }
 
-function userRequestSummaries(textParts, messageById) {
-  return textParts
-    .filter((part) => messageById.get(part.row.message_id)?.role === 'user')
-    .map((part) => {
-      const prompt = clean(redactSecrets(part.data.text || ''));
-      return {
-        at: msToIso(part.row.time_created),
-        atMs: Number(part.row.time_created),
-        prompt,
-        requestedJobs: requestedJobCount(prompt),
-      };
-    })
-    .filter((request) => request.prompt.length > 0);
-}
-
-function taskCallSummary(part) {
-  const input = objectOrEmpty(part.data.state?.input);
-  const metadata = objectOrEmpty(part.data.state?.metadata);
-  const prompt = typeof input.prompt === 'string' ? input.prompt : '';
-  const description = stringValue(input.description || metadata.description || part.data.state?.title);
-  const sessionId = stringValue(input.task_id || metadata.sessionId);
-  const subagentType = stringValue(input.subagent_type || metadata.subagent_type || metadata.agent);
-  const isStatusPoll = Boolean(input.task_id) ||
-    /\b(check|poll|status|force|abort|progress|result)\b/i.test(description) ||
-    /\b(return your final outcome now|if still working|current status|report your current status|still running)\b/i.test(prompt);
-
-  return {
-    at: msToIso(part.row.time_created),
-    atMs: Number(part.row.time_created),
-    description,
-    subagentType,
-    sessionId,
-    status: stringValue(part.data.state?.status),
-    isStatusPoll,
-    promptBytes: Buffer.byteLength(prompt, 'utf8'),
-    proxyLeak: hasProxyLeak(prompt),
-    url: firstUrl(prompt),
-  };
-}
-
-function providerErrorSummary(message) {
-  const error = message.data.error;
-  if (!error) return null;
-  const rawMessage = stringValue(error.data?.message || error.message || error.name || 'unknown provider error');
-  const statusCode = error.data?.statusCode ?? statusCodeFromText(rawMessage);
-  return {
-    at: msToIso(message.row.time_created),
-    provider: stringValue(message.data.providerID),
-    model: stringValue(message.data.modelID),
-    statusCode,
-    category: providerErrorCategory(rawMessage, statusCode),
-    message: redactSecrets(rawMessage),
-  };
-}
-
-function detectPolicyIssues(session, parts, textParts, messageById, providerErrors, context = {}) {
+function detectPolicyIssues(ref, session, providerErrors, context = {}) {
   const issues = [];
-  const taskParts = parts.filter((p) => p.data.type === 'tool' && p.data.tool === 'task');
-  const taskCalls = context.taskCalls || taskParts.map(taskCallSummary);
-  const latestTaskCalls = context.latestTaskCalls || taskCalls;
+  const dispatchCalls = context.dispatchCalls || [];
+  const latestDispatchCalls = context.latestDispatchCalls || dispatchCalls;
   const children = context.children || [];
   const latestChildren = context.latestChildren || children;
+  const unresolvedChildren = context.unresolvedChildren || [];
   const activeRequest = context.activeRequest || null;
-  const statusPolls = taskCalls.filter((task) => task.isStatusPoll);
+  const assistantTexts = messageEvents(session, 'assistant');
+  const latestAssistantText = assistantTexts
+    .filter((event) => !activeRequest || event.atMs >= activeRequest.atMs)
+    .map((event) => event.text || '')
+    .join('\n');
+  const finalText = assistantTexts.slice(-5).map((event) => event.text || '').join('\n');
+
+  const statusPolls = dispatchCalls.filter((call) => call.isStatusPoll);
   if (statusPolls.length > 0) {
     issues.push({
       type: 'task_status_poll',
       severity: 'high',
       count: statusPolls.length,
-      detail: 'A task call tried to poll/check an existing task session.',
+      detail: 'A dispatch call tried to poll/check an existing subagent session.',
     });
   }
 
-  const proxyLeakCount = parts.reduce((count, part) => count + (partHasProxyLeak(part) ? 1 : 0), 0);
+  const proxyLeakCount = dispatchCalls.filter((call) => call.proxyLeak).length;
   if (proxyLeakCount > 0) {
     issues.push({
       type: 'proxy_prompt_leak',
@@ -290,13 +251,12 @@ function detectPolicyIssues(session, parts, textParts, messageById, providerErro
     });
   }
 
-  const childTaskCalls = session.parentId ? taskParts.length : 0;
-  if (childTaskCalls > 0) {
+  if (context.isChildSession && dispatchCalls.length > 0) {
     issues.push({
       type: 'subagent_spawned_task',
       severity: 'high',
-      count: childTaskCalls,
-      detail: 'A child/subagent session used the task tool.',
+      count: dispatchCalls.length,
+      detail: 'A child/subagent session spawned more child work.',
     });
   }
 
@@ -330,7 +290,7 @@ function detectPolicyIssues(session, parts, textParts, messageById, providerErro
     });
   }
 
-  const duplicateUrlCount = duplicateTaskUrlCount(taskCalls);
+  const duplicateUrlCount = duplicateDispatchUrlCount(dispatchCalls);
   if (duplicateUrlCount > 0) {
     issues.push({
       type: 'duplicate_task_url',
@@ -340,35 +300,22 @@ function detectPolicyIssues(session, parts, textParts, messageById, providerErro
     });
   }
 
-  const runningTasks = taskCalls.filter((task) => task.status && task.status !== 'completed');
-  if (runningTasks.length > 0) {
-    const consumed = runningTasks.filter((task) => {
-      if (!task.sessionId) return false;
-      const child = children.find((candidate) => candidate.id === task.sessionId);
-      return child && child.outcome !== 'unknown';
-    }).length;
+  if (unresolvedChildren.length > 0) {
     issues.push({
-      type: consumed === runningTasks.length ? 'task_result_not_consumed' : 'task_still_running',
-      severity: consumed === runningTasks.length ? 'medium' : 'high',
-      count: runningTasks.length,
-      detail: consumed === runningTasks.length
-        ? 'One or more task calls still show running even though child sessions have terminal-looking outcomes; root did not consume the final task result.'
-        : 'One or more task calls still show running and do not have terminal child outcomes.',
+      type: 'task_still_running',
+      severity: 'high',
+      count: unresolvedChildren.length,
+      detail: 'One or more dispatches reference child sessions that do not yet have a visible terminal outcome.',
     });
   }
 
-  const latestAssistantText = textParts
-    .filter((part) => messageById.get(part.row.message_id)?.role === 'assistant')
-    .filter((part) => !activeRequest || Number(part.row.time_created) >= activeRequest.atMs)
-    .map((part) => part.data.text || '')
-    .join('\n');
-  const latestDispatches = latestTaskCalls.filter((task) => !task.isStatusPoll).length;
+  const latestDispatches = latestDispatchCalls.filter((call) => !call.isStatusPoll).length;
   if (activeRequest?.requestedJobs && latestDispatches > 0 && latestDispatches < activeRequest.requestedJobs && !mentionsLimitedCandidatePool(latestAssistantText)) {
     issues.push({
       type: 'requested_count_not_met',
       severity: 'high',
       count: activeRequest.requestedJobs - latestDispatches,
-      detail: `Latest request asked for ${activeRequest.requestedJobs} jobs, but only ${latestDispatches} task dispatches are visible after that prompt.`,
+      detail: `Latest request asked for ${activeRequest.requestedJobs} jobs, but only ${latestDispatches} dispatches are visible after that prompt.`,
     });
   }
 
@@ -381,105 +328,32 @@ function detectPolicyIssues(session, parts, textParts, messageById, providerErro
     });
   }
 
-  const finalText = textParts
-    .filter((part) => messageById.get(part.row.message_id)?.role === 'assistant')
-    .slice(-5)
-    .map((part) => part.data.text || '')
-    .join('\n');
   if (latestDispatches > 0 && !hasOutcome(latestAssistantText) && !/round .*in flight|still running|waiting/i.test(latestAssistantText)) {
     issues.push({
       type: 'latest_request_no_visible_final_outcome',
       severity: 'high',
       count: 1,
-      detail: 'Latest request dispatched task work but assistant text after that request has no final outcome or in-flight notice.',
+      detail: 'Latest request dispatched child work but assistant text after that request has no final outcome or in-flight notice.',
     });
-  } else if (taskParts.length > 0 && !hasOutcome(finalText) && !/round .*in flight|still running|waiting/i.test(finalText)) {
+  } else if (dispatchCalls.length > 0 && !hasOutcome(finalText) && !/round .*in flight|still running|waiting/i.test(finalText)) {
     issues.push({
       type: 'no_visible_final_outcome',
       severity: 'medium',
       count: 1,
-      detail: 'Session dispatched task work but recent assistant text has no final outcome or in-flight notice.',
+      detail: 'Session dispatched child work but recent assistant text has no final outcome or in-flight notice.',
     });
   }
 
   return issues;
 }
 
-function partHasProxyLeak(part) {
-  const data = part.data;
-  if (data.type === 'text' || data.type === 'reasoning') return hasProxyLeak(data.text || '');
-  if (data.type === 'tool') return hasProxyLeak(JSON.stringify(data.state?.input || {}));
-  return false;
-}
-
-function childSummary(session) {
-  const rows = loadRows(session.id);
-  const messages = rows.messages.map((row) => ({ row, data: parseJson(row.data) }));
-  const parts = rows.parts.map((row) => ({ row, data: parseJson(row.data) }));
-  const messageById = new Map(messages.map((m) => [m.row.id, m.data]));
-  const assistantTexts = parts
-    .filter((p) => p.data.type === 'text' && messageById.get(p.row.message_id)?.role === 'assistant')
-    .map((p) => p.data.text || '');
-  const finalText = assistantTexts.slice(-5).join('\n');
-  const providerErrors = messages.map(providerErrorSummary).filter(Boolean);
-  const taskCalls = parts.filter((p) => p.data.type === 'tool' && p.data.tool === 'task').length;
-  const trackerWrites = parts.filter((p) => p.data.type === 'tool' && /batch\/tracker-additions\/.*\.tsv/.test(JSON.stringify(p.data.state?.input || {}))).length;
-  const toolErrors = parts.filter((p) => p.data.type === 'tool' && (p.data.state?.status === 'error' || p.data.state?.error)).length;
-  const dedupeMiss = /\b(DUPLICATE|already\s+\*{0,2}Applied|already applied|per \[H2\]|Hard Limit #2|No re-dispatch needed)\b/i.test(finalText) ||
-    /\bpreviously applied (on|as|under)\b/i.test(finalText);
-
-  return {
-    id: session.id,
-    title: session.title,
-    startedAt: session.startedAt,
-    startedAtMs: Date.parse(session.startedAt),
-    endedAt: session.endedAt,
-    outcome: outcomeFromText(finalText, trackerWrites),
-    providerErrors: providerErrors.length,
-    taskCalls,
-    toolErrors,
-    dedupeMiss,
-    trackerWrites,
-    models: modelUsageFromMessages(messages),
-  };
-}
-
-function outcomeFromText(text, trackerWrites = 0) {
-  const explicitFailed = /\b(APPLICATION OUTCOME|RESULT|STATUS)(?:\*\*)?\s*[:|-]\s*\*{0,2}\s*(FAILED|APPLY FAILED)\b/i.test(text) ||
-    /\|\s*\*\*?Status\*\*?\s*\|\s*\*\*?Failed\*\*?/i.test(text);
-  const explicitSkipped = /\b(APPLICATION OUTCOME|RESULT|STATUS)(?:\*\*)?\s*[:|-]\s*\*{0,2}\s*(SKIP|SKIPPED|DISCARDED|DISCARD)\b/i.test(text) ||
-    /\|\s*\*\*?Status\*\*?\s*\|\s*\*\*?(SKIP|SKIPPED|Discarded|DISCARDED)\*\*?/i.test(text);
-  const explicitApplied = /\b(APPLICATION OUTCOME|RESULT|STATUS)(?:\*\*)?\s*[:|-]\s*\*{0,2}\s*APPLIED\b/i.test(text) ||
-    /\|\s*\*\*?Status\*\*?\s*\|\s*\*\*?Applied\*\*?/i.test(text);
-
-  if (explicitFailed) return 'Failed';
-  if (explicitSkipped) return 'Discarded';
-  if (explicitApplied) return 'Applied';
-
-  if (/\bAPPLY FAILED\b/i.test(text) || /^\s*(FAILED|Failed)\b/m.test(text)) return 'Failed';
-  if (/^\s*(SKIP|SKIPPED|DISCARDED|Discarded)\b/m.test(text) ||
-    /\b(DUPLICATE|job posting closed|role no longer available)\b/i.test(text)) return 'Discarded';
-  if (/\bwith\s+\*\*?Applied\*\*?\s+status\b/i.test(text) ||
-    /\bAPPLIED\s+https?:\/\//i.test(text) ||
-    /\b(successfully submitted|Applied via|Thank you for applying|confirmation page)\b/i.test(text)) return 'Applied';
-  if (trackerWrites > 0) return 'TSV written';
-  return 'unknown';
-}
-
-function hasOutcome(text) {
-  return outcomeFromText(text) !== 'unknown' ||
-    /tracker-additions\/.*\.tsv/i.test(text) ||
-    /\bAll\s+\d+\s+jobs?\s+dispatched\b/i.test(text) ||
-    /\*\*(Applied|Skipped|Failed|Discarded)\s*\(\d+\):\*\*/i.test(text);
-}
-
-function sessionStatus({ taskCalls, children, childOutcomes, childProviderErrors, policyIssues, providerErrors }) {
+function sessionStatus({ dispatchCalls, children, unresolvedChildren, childOutcomes, childProviderErrors, policyIssues, providerErrors }) {
   if (policyIssues.some((issue) => issue.severity === 'high')) return 'attention';
   if (providerErrors.length > 0) return 'attention';
   if (childProviderErrors > 0) return 'attention';
-  if (taskCalls.some((task) => task.status && task.status !== 'completed')) return 'in-flight-or-incomplete';
-  if (taskCalls.length > 0 && children.length > childOutcomes) return 'in-flight-or-incomplete';
-  if (taskCalls.length > 0 && children.length === childOutcomes) return 'complete';
+  if (unresolvedChildren.length > 0) return 'in-flight-or-incomplete';
+  if (dispatchCalls.length > 0 && children.length > childOutcomes) return 'in-flight-or-incomplete';
+  if (dispatchCalls.length > 0 && children.length === childOutcomes) return 'complete';
   return 'observed';
 }
 
@@ -519,12 +393,11 @@ function listTsv(dir) {
 function nextActions({ tracker, policyIssues, providerErrors, children }) {
   const actions = [];
   if (tracker.pending.length > 0) actions.push('Run `npm run merge && npm run verify` when you are ready to fold pending TSV outcomes into day files.');
-  if (policyIssues.some((issue) => issue.type === 'task_status_poll')) actions.push('Avoid resuming by spawning "check task status" tasks; inspect telemetry/trace and tracker files instead.');
-  if (policyIssues.some((issue) => issue.type === 'proxy_prompt_leak')) actions.push('Restart OpenCode after updating the harness so new sessions load the proxy prompt hygiene rule.');
-  if (policyIssues.some((issue) => issue.type === 'free_model_usage')) actions.push('Restart OpenCode and rerun `npm run update-harness` so application tiers use the bundled DeepSeek V4 Flash route.');
+  if (policyIssues.some((issue) => issue.type === 'task_status_poll')) actions.push('Avoid resuming by spawning "check status" child sessions; inspect telemetry/trace and tracker files instead.');
+  if (policyIssues.some((issue) => issue.type === 'proxy_prompt_leak')) actions.push('Refresh the harness instructions so new sessions inherit the proxy prompt hygiene rule.');
+  if (policyIssues.some((issue) => issue.type === 'free_model_usage')) actions.push('Refresh the harness config so application tiers use the intended paid/default route.');
   if (policyIssues.some((issue) => issue.type === 'requested_count_not_met')) actions.push('Resume the latest apply request or start a new run for the remaining requested jobs; telemetry did not see enough dispatches after the latest prompt.');
-  if (policyIssues.some((issue) => issue.type === 'latest_request_no_visible_final_outcome')) actions.push('Inspect the latest child sessions before treating the current OpenCode run as complete.');
-  if (policyIssues.some((issue) => issue.type === 'task_result_not_consumed')) actions.push('Resume the root session only to collect final task results and summarize; do not dispatch new applications until it reconciles current children.');
+  if (policyIssues.some((issue) => issue.type === 'latest_request_no_visible_final_outcome')) actions.push('Inspect the latest child sessions before treating the current run as complete.');
   if (policyIssues.some((issue) => issue.type === 'duplicate_task_url')) actions.push('Do not re-dispatch duplicate URLs automatically; inspect the prior child result and tracker TSV before retrying.');
   if (policyIssues.some((issue) => issue.type === 'dedupe_preflight_missed')) actions.push('Tighten candidate preflight: grep all application day files plus pending/merged TSVs before dispatching replacements.');
   if (providerErrors.some((err) => err.statusCode === 402)) actions.push('Provider balance errors occurred; use a non-402 fallback or add provider credits before retrying paid routes.');
@@ -535,6 +408,7 @@ function nextActions({ tracker, policyIssues, providerErrors, children }) {
 function summaryForList(telemetry) {
   return {
     id: telemetry.session.id,
+    harness: telemetry.session.harness,
     startedAt: telemetry.session.startedAt,
     updatedAt: telemetry.session.endedAt,
     status: telemetry.status,
@@ -547,112 +421,43 @@ function summaryForList(telemetry) {
   };
 }
 
-function modelUsageFromMessages(messages) {
-  const counts = new Map();
-  for (const message of messages) {
-    const provider = stringValue(message.data.providerID);
-    const model = stringValue(message.data.modelID);
-    if (!provider && !model) continue;
-    const key = `${provider}\u0000${model}`;
-    const current = counts.get(key) || { provider, model, count: 0 };
-    current.count += 1;
-    counts.set(key, current);
-  }
-  return [...counts.values()].sort((a, b) => b.count - a.count || modelLabel(a).localeCompare(modelLabel(b)));
-}
-
-function mergeModelUsage(groups) {
-  const counts = new Map();
-  for (const group of groups) {
-    for (const item of group || []) {
-      const provider = stringValue(item.provider);
-      const model = stringValue(item.model);
-      const key = `${provider}\u0000${model}`;
-      const current = counts.get(key) || { provider, model, count: 0 };
-      current.count += Number(item.count || 0);
-      counts.set(key, current);
-    }
-  }
-  return [...counts.values()].sort((a, b) => b.count - a.count || modelLabel(a).localeCompare(modelLabel(b)));
-}
-
-function modelLabel(model) {
-  return `${model.provider || '(unknown)'}/${model.model || '(unknown)'} x${model.count}`;
-}
-
-function isFreeModelRoute(provider, model) {
-  const route = `${provider}/${model}`.toLowerCase();
-  return route.includes(':free') ||
-    route.includes('/big-pickle') ||
-    route.includes('minimax-m2.5-free') ||
-    route.includes('glm-4.5-air') ||
-    route.includes('gpt-oss-20b') ||
-    route.includes('qwen3-next-80b-a3b-instruct:free');
-}
-
-function requestedJobCount(prompt) {
-  const text = String(prompt || '').toLowerCase();
-  if (!/\b(job|jobs|application|applications)\b/.test(text)) return null;
-  if (!/\b(apply|applt|another|nother|more|process)\b/.test(text)) return null;
-  const match = text.match(/\b(\d{1,3})\b/);
-  return match ? Number(match[1]) : null;
-}
-
-function firstUrl(text) {
-  const match = String(text || '').match(/https?:\/\/[^\s)>\]]+/i);
-  return match ? match[0].replace(/[.,;]+$/, '') : '';
-}
-
-function duplicateTaskUrlCount(taskCalls) {
-  const seen = new Set();
-  const duplicates = new Set();
-  for (const task of taskCalls) {
-    if (!task.url || task.isStatusPoll) continue;
-    if (seen.has(task.url)) duplicates.add(task.url);
-    seen.add(task.url);
-  }
-  return duplicates.size;
-}
-
-function mentionsLimitedCandidatePool(text) {
-  return /\b(only|just)\s+\d+\s+(candidate|candidates|jobs?|applications?)\b/i.test(text) ||
-    /\b(no more|not enough|ran out of|exhausted)\s+(candidate|candidates|jobs?|applications?|pipeline)\b/i.test(text);
-}
-
 function printList(items) {
   const rows = items.map((item) => [
     item.id,
+    item.harness,
     item.startedAt.replace('T', ' ').replace(/\.\d+Z$/, 'Z'),
     item.status,
     String(item.tasks),
     `${item.outcomes}/${item.children}`,
     String(item.issues + item.providerErrors),
-    shorten(item.prompt || '', 42),
+    shorten(item.prompt || '', 36),
   ]);
-  const header = ['session', 'started', 'status', 'tasks', 'outcomes', 'alerts', 'prompt'];
+  const header = ['session', 'harness', 'started', 'status', 'dispatches', 'outcomes', 'alerts', 'prompt'];
   printTable(header, rows);
 }
 
 function printStatus(telemetry) {
-  console.log(`project:   ${telemetry.projectDir}`);
-  console.log(`session:   ${telemetry.session.id}`);
-  console.log(`status:    ${telemetry.status}`);
-  console.log(`started:   ${telemetry.session.startedAt}`);
-  console.log(`prompt:    ${shorten(telemetry.prompt || '', 100)}`);
+  console.log(`project:    ${telemetry.projectDir}`);
+  console.log(`session:    ${telemetry.session.id}`);
+  console.log(`harness:    ${telemetry.session.harness}`);
+  console.log(`status:     ${telemetry.status}`);
+  console.log(`started:    ${telemetry.session.startedAt}`);
+  if (telemetry.session.title) console.log(`title:      ${telemetry.session.title}`);
+  console.log(`prompt:     ${shorten(telemetry.prompt || '', 100)}`);
   if (telemetry.userRequests.length > 1 || telemetry.latestRequest?.requestedJobs) {
     const latest = telemetry.latestRequest;
     const requestDetail = latest?.requestedJobs
       ? `latest ${latest.taskDispatches}/${latest.requestedJobs} dispatches`
       : `latest ${latest?.taskDispatches ?? 0} dispatches`;
-    console.log(`requests:  ${telemetry.userRequests.length} user prompt${telemetry.userRequests.length === 1 ? '' : 's'} (${requestDetail})`);
+    console.log(`requests:   ${telemetry.userRequests.length} user prompt${telemetry.userRequests.length === 1 ? '' : 's'} (${requestDetail})`);
   }
-  console.log(`tasks:     ${telemetry.tasks.total} (${telemetry.tasks.statusPolls} status-poll, ${telemetry.tasks.running} running)`);
-  console.log(`children:  ${telemetry.children.withOutcomes}/${telemetry.children.total} with outcomes`);
-  console.log(`tracker:   ${telemetry.tracker.pending.length} pending TSVs, ${telemetry.tracker.mergedCount} merged TSVs`);
-  console.log(`ledger:    ${telemetry.tracker.ledger.error ? `error: ${telemetry.tracker.ledger.error}` : telemetry.tracker.ledger.exists ? `${telemetry.tracker.ledger.events} events` : 'missing'}`);
-  console.log(`models:    ${telemetry.models.slice(0, 3).map(modelLabel).join(', ') || 'none'}`);
-  console.log(`errors:    ${telemetry.providerErrors.length} root, ${telemetry.children.providerErrors} child provider errors, ${telemetry.children.toolErrors} child tool errors`);
-  console.log(`issues:    ${telemetry.policyIssues.length}`);
+  console.log(`dispatches: ${telemetry.tasks.total} (${telemetry.tasks.statusPolls} status-poll, ${telemetry.tasks.running} unresolved)`);
+  console.log(`children:   ${telemetry.children.withOutcomes}/${telemetry.children.total} with outcomes`);
+  console.log(`tracker:    ${telemetry.tracker.pending.length} pending TSVs, ${telemetry.tracker.mergedCount} merged TSVs`);
+  console.log(`ledger:     ${telemetry.tracker.ledger.error ? `error: ${telemetry.tracker.ledger.error}` : telemetry.tracker.ledger.exists ? `${telemetry.tracker.ledger.events} events` : 'missing'}`);
+  console.log(`models:     ${telemetry.models.slice(0, 3).map(modelLabel).join(', ') || 'none'}`);
+  console.log(`errors:     ${telemetry.providerErrors.length} root, ${telemetry.children.providerErrors} child provider errors, ${telemetry.children.toolErrors} child tool errors`);
+  console.log(`issues:     ${telemetry.policyIssues.length}`);
 
   if (telemetry.policyIssues.length > 0) {
     console.log('\nissues:');
@@ -690,20 +495,20 @@ function printStatus(telemetry) {
 function printShow(telemetry) {
   printStatus(telemetry);
   if (telemetry.tasks.calls.length > 0) {
-    console.log('\ntask dispatches:');
+    console.log('\ndispatches:');
     for (const task of telemetry.tasks.calls) {
       const flags = [
         task.isStatusPoll ? 'status-poll' : '',
         task.status && task.status !== 'completed' ? task.status : '',
         task.proxyLeak ? 'proxy-values-detected' : '',
       ].filter(Boolean).join(', ');
-      console.log(`  - ${task.at} ${task.description || '(no description)'} ${task.sessionId || ''} ${task.subagentType || ''}${flags ? ` [${flags}]` : ''}`);
+      console.log(`  - ${task.at} ${task.name} ${task.description || '(no description)'} ${task.sessionId || ''} ${task.subagentType || ''}${flags ? ` [${flags}]` : ''}`);
     }
   }
   if (telemetry.providerErrors.length > 0) {
     console.log('\nprovider errors:');
     for (const err of telemetry.providerErrors) {
-      console.log(`  - ${err.at} ${err.provider}/${err.model} ${err.statusCode || ''} ${err.category}: ${err.message}`);
+      console.log(`  - ${err.at} ${err.provider || '(unknown)'}/${err.model || '(unknown)'} ${err.statusCode || ''} ${err.category}: ${err.message}`);
     }
   }
 }
@@ -715,72 +520,26 @@ function printTable(header, rows) {
   for (const row of rows) console.log(row.map((cell, i) => pad(cell, widths[i])).join('  '));
 }
 
-function latestRootTelemetry(opts) {
-  const sessions = discoverSessions(opts);
-  const roots = sessions.filter((session) => !session.parentId);
-  if (roots.length === 0) return { sessions, telemetry: null };
-  return { sessions, telemetry: analyzeSession(roots[0], sessions, opts) };
-}
-
-function objectOrEmpty(value) {
-  return value && typeof value === 'object' ? value : {};
-}
-
-function stringValue(value) {
-  return typeof value === 'string' ? value : value == null ? '' : String(value);
-}
-
-function statusCodeFromText(text) {
-  const match = String(text).match(/\b(40[0-9]|42[0-9]|50[0-9])\b/);
-  return match ? Number(match[1]) : undefined;
-}
-
-function providerErrorCategory(text, statusCode) {
-  if (statusCode === 402 || /insufficient|balance|credits|diem/i.test(text)) return 'balance';
-  if (statusCode === 429 || /rate.?limit|quota/i.test(text)) return 'rate-limit';
-  if (/overload|temporarily unavailable|timeout/i.test(text)) return 'transient';
-  return 'provider-error';
-}
-
-function hasProxyLeak(text) {
-  const raw = String(text || '');
-  if (!/proxy/i.test(raw)) return false;
-  return /\b(server|username|password|bypass)["']?\s*[:=]\s*["']?[^"',\s)}]+/i.test(raw) ||
-    /brd-customer|superproxy|oxylabs|smartproxy|soax/i.test(raw);
-}
-
-function redactSecrets(text) {
-  return String(text || '')
-    .replace(/\b(password|username|server|bypass)["']?\s*[:=]\s*["']?[^"',\s)}]+/gi, '$1=<redacted>')
-    .replace(/brd-customer-[A-Za-z0-9_.-]+/g, '<redacted-proxy-user>');
-}
-
-function relativeToProject(file, projectDir = PROJECT_DIR) {
-  return file.startsWith(`${projectDir}/`) ? file.slice(projectDir.length + 1) : file;
-}
-
-function clean(text) {
-  return String(text || '').replace(/\s+/g, ' ').trim();
-}
-
-function shorten(value, max) {
-  const text = clean(value);
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 1)}...`;
-}
-
-function pad(value, width) {
-  const text = String(value ?? '');
-  return text.length >= width ? text : text + ' '.repeat(width - text.length);
+async function recentTelemetry(opts) {
+  const refs = await discoverProjectSessions(opts);
+  if (refs.length === 0) return { refs, context: null, telemetry: null };
+  const context = loadContext(refs);
+  const roots = rootRefs(context.loadedRefs, context.graph);
+  const selected = roots[0] || refs[0] || null;
+  return {
+    refs,
+    context,
+    telemetry: selected ? analyzeSession(selected, context, opts) : null,
+  };
 }
 
 async function runWatch(opts) {
   while (true) {
     console.clear();
     console.log(new Date().toISOString());
-    const { telemetry } = latestRootTelemetry(opts);
+    const { telemetry } = await recentTelemetry(opts);
     if (!telemetry) {
-      console.log('No recent JobForge OpenCode sessions found.');
+      console.log('No recent JobForge sessions found.');
     } else {
       printStatus(telemetry);
     }
@@ -804,15 +563,15 @@ async function main() {
       console.error(`job-forge telemetry:list: ${opts.error}`);
       return 2;
     }
-    const sessions = discoverSessions(opts);
-    const items = sessions
-      .filter((session) => !session.parentId)
-      .map((session) => summaryForList(analyzeSession(session, sessions, opts)));
+    const refs = await discoverProjectSessions(opts);
+    if (refs.length === 0) {
+      console.error('job-forge telemetry:list: no recent JobForge sessions found');
+      return 2;
+    }
+    const context = loadContext(refs);
+    const items = rootRefs(context.loadedRefs, context.graph).map((ref) => summaryForList(analyzeSession(ref, context, opts)));
     if (opts.json) {
       console.log(JSON.stringify(items, null, 2));
-    } else if (items.length === 0) {
-      console.error('job-forge telemetry:list: no recent JobForge OpenCode sessions found');
-      return 2;
     } else {
       printList(items);
     }
@@ -829,9 +588,9 @@ async function main() {
       console.error(`job-forge telemetry:status: ${opts.error}`);
       return 2;
     }
-    const { telemetry } = latestRootTelemetry(opts);
+    const { telemetry } = await recentTelemetry(opts);
     if (!telemetry) {
-      console.error('job-forge telemetry:status: no recent JobForge OpenCode sessions found');
+      console.error('job-forge telemetry:status: no recent JobForge sessions found');
       return 2;
     }
     if (opts.json) console.log(JSON.stringify(telemetry, null, 2));
@@ -853,13 +612,18 @@ async function main() {
       console.error('job-forge telemetry:show: missing <id-or-prefix>');
       return 2;
     }
-    const sessions = discoverSessions(opts, { includeAllForShow: true });
-    const session = findSessionById(sessions, positional[0]);
-    if (!session) {
+    const refs = await discoverProjectSessions({ ...opts, since: undefined });
+    const sessionRef = findObservedSession(refs, positional[0]);
+    if (!sessionRef) {
       console.error(`job-forge telemetry:show: no session matches "${positional[0]}"`);
       return 2;
     }
-    const telemetry = analyzeSession(session, sessions, opts);
+    const context = loadContext(refs);
+    if (!context.sessionsById.has(sessionRef.id)) {
+      console.error(`job-forge telemetry:show: could not load session "${sessionRef.id}": ${context.loadErrors.get(sessionRef.id) || 'unknown parse error'}`);
+      return 2;
+    }
+    const telemetry = analyzeSession(sessionRef, context, opts);
     if (opts.json) console.log(JSON.stringify(telemetry, null, 2));
     else printShow(telemetry);
     return 0;

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# job-forge batch runner — standalone orchestrator for opencode run workers
-# Reads batch-input.tsv, delegates each offer to an opencode run worker,
+# job-forge batch runner — standalone orchestrator for headless AI CLI workers
+# Reads batch-input.tsv, delegates each offer to a worker CLI invocation,
 # tracks state in batch-state.tsv for resumability.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,26 +1,37 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'child_process';
-import { existsSync } from 'fs';
 import { dirname, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { audit, formatAuditResult, formatPolicyExplanation, loadPolicy, resultFails } from '@razroo/iso-guard';
-import { defaultOpenCodeDbPath, findSessionById, parseSinceCutoff } from '@razroo/iso-trace';
+import {
+  buildSessionGraph,
+  collectDispatchCalls,
+  descendantIds,
+  discoverProjectSessions,
+  findObservedSession,
+  loadObservedSession,
+  messageEvents,
+  objectOrEmpty,
+  redactSecrets,
+  safeJson,
+  stringValue,
+  toolRecords,
+} from '../lib/jobforge-observability.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(__dirname, '..');
 const PROJECT_DIR = process.env.JOB_FORGE_PROJECT || process.cwd();
 const DEFAULT_SINCE = '24h';
 
-const USAGE = `job-forge guard - deterministic JobForge policy audits over local OpenCode traces
+const USAGE = `job-forge guard - deterministic JobForge policy audits over local traces
 
 Usage:
-  job-forge guard:audit [latest|<id-or-prefix>] [--since 24h] [--cwd <dir>] [--policy <path>] [--json] [--fail-on error|warn|off] [--root-only]
+  job-forge guard:audit [latest|<id-or-prefix>] [--since 24h] [--cwd <dir>] [--harness <name>] [--policy <path>] [--json] [--fail-on error|warn|off] [--root-only]
   job-forge guard:explain [--policy <path>] [--json]
 
 The default policy is templates/guards/jobforge-baseline.yaml. Guard audits are
-local-only and passive: JobForge converts OpenCode SQLite rows into iso-guard
-events and never asks agents or MCPs to emit extra telemetry.`;
+local-only and passive: JobForge converts normalized session events into
+iso-guard inputs and never asks agents or MCPs to emit extra telemetry.`;
 
 const [cmd = 'help', ...args] = process.argv.slice(2);
 
@@ -32,6 +43,7 @@ function parseArgs(rawArgs, { allowSession = false } = {}) {
   const opts = {
     since: DEFAULT_SINCE,
     cwd: PROJECT_DIR,
+    harness: '',
     policy: defaultPolicyPath(),
     json: false,
     failOn: 'error',
@@ -49,6 +61,10 @@ function parseArgs(rawArgs, { allowSession = false } = {}) {
       opts.cwd = valueAfter(rawArgs, ++i, '--cwd');
     } else if (arg.startsWith('--cwd=')) {
       opts.cwd = arg.slice('--cwd='.length);
+    } else if (arg === '--harness') {
+      opts.harness = valueAfter(rawArgs, ++i, '--harness');
+    } else if (arg.startsWith('--harness=')) {
+      opts.harness = arg.slice('--harness='.length);
     } else if (arg === '--policy') {
       opts.policy = valueAfter(rawArgs, ++i, '--policy');
     } else if (arg.startsWith('--policy=')) {
@@ -86,165 +102,57 @@ function valueAfter(values, index, flag) {
   return value;
 }
 
-function queryOpenCodeDb(dbPath, sql) {
-  const result = spawnSync('sqlite3', ['-json', dbPath, sql], {
-    encoding: 'utf8',
-    maxBuffer: 32 * 1024 * 1024,
-  });
-  if ((result.status ?? 0) !== 0) {
-    const detail = result.stderr?.trim() || result.stdout?.trim() || `exit ${result.status ?? 1}`;
-    throw new Error(`job-forge guard: sqlite3 query failed: ${detail}`);
-  }
-  return JSON.parse(result.stdout || '[]');
-}
-
-function sqlString(value) {
-  return `'${String(value).replaceAll("'", "''")}'`;
-}
-
-function msToIso(ms) {
-  return new Date(Number(ms)).toISOString();
-}
-
-function discoverSessions(opts, { includeAllForShow = false } = {}) {
-  const dbPath = defaultOpenCodeDbPath();
-  if (!existsSync(dbPath)) return [];
-
-  const where = [
-    's.time_archived is null',
-    `s.directory = ${sqlString(opts.cwd)}`,
-  ];
-  const sinceMs = includeAllForShow ? undefined : parseSinceCutoff(opts.since);
-  if (sinceMs !== undefined) where.push(`s.time_created >= ${Number(sinceMs)}`);
-
-  const rows = queryOpenCodeDb(dbPath, [
-    'select',
-    '  s.id,',
-    '  s.parent_id,',
-    '  s.title,',
-    '  s.directory,',
-    '  s.time_created,',
-    '  s.time_updated,',
-    '  (select count(*) from message m where m.session_id = s.id) as turn_count,',
-    '  (',
-    '    (select coalesce(sum(length(data)), 0) from message m where m.session_id = s.id) +',
-    '    (select coalesce(sum(length(data)), 0) from part p where p.session_id = s.id)',
-    '  ) as size_bytes',
-    'from session s',
-    `where ${where.join(' and ')}`,
-    'order by s.time_updated desc',
-  ].join(' '));
-
-  return rows.map((row) => ({
-    id: row.id,
-    parentId: row.parent_id || null,
-    title: row.title || '',
-    cwd: row.directory,
-    startedAt: msToIso(row.time_created),
-    startedAtMs: Number(row.time_created),
-    endedAt: msToIso(row.time_updated),
-    endedAtMs: Number(row.time_updated),
-    turnCount: row.turn_count ?? 0,
-    sizeBytes: row.size_bytes ?? 0,
-  }));
-}
-
-function loadRows(sessionId) {
-  const dbPath = defaultOpenCodeDbPath();
-  const id = sqlString(sessionId);
-  return {
-    messages: queryOpenCodeDb(dbPath, `select id, time_created, data from message where session_id = ${id} order by time_created, id`),
-    parts: queryOpenCodeDb(dbPath, `select id, message_id, time_created, data from part where session_id = ${id} order by time_created, id`),
-  };
-}
-
-function parseJson(raw) {
-  try {
-    return JSON.parse(raw || '{}');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { __parseError: message, __raw: raw || '' };
-  }
-}
-
-function selectSession(refs, positional) {
+function selectSession(refs, roots, positional) {
   const requested = positional[0];
-  if (!requested || requested === 'latest') {
-    return refs.find((ref) => !ref.parentId) || refs[0] || null;
-  }
-  return findSessionById(refs, requested);
+  if (!requested || requested === 'latest') return roots[0] || refs[0] || null;
+  return findObservedSession(refs, requested);
 }
 
-function sessionsForAudit(selected, allSessions, includeChildren) {
-  if (!includeChildren) return [selected];
-  const children = allSessions
-    .filter((candidate) => candidate.parentId === selected.id)
-    .sort((a, b) => a.startedAtMs - b.startedAtMs);
-  return [selected, ...children];
-}
-
-function buildGuardEvents(sessions) {
+function buildGuardEvents(sessionEntries, childIds) {
   const events = [];
-  const rootId = sessions[0]?.id;
 
-  for (const session of sessions) {
-    const rows = loadRows(session.id);
-    const messages = rows.messages.map((row) => ({ row, data: parseJson(row.data) }));
-    const messageById = new Map(messages.map((message) => [message.row.id, message.data]));
+  for (const entry of sessionEntries) {
+    const { ref, session } = entry;
     let requestIndex = 0;
 
-    for (const row of rows.parts) {
-      const data = parseJson(row.data);
-      const message = messageById.get(row.message_id) || {};
-      const role = message.role || 'unknown';
-      const at = msToIso(row.time_created);
+    for (const message of messageEvents(session)) {
+      if (message.role === 'user') requestIndex += 1;
+      events.push({
+        type: 'message',
+        name: message.role,
+        at: message.at,
+        source: `${ref.source.harness}:${session.id}`,
+        text: message.text || '',
+        data: {
+          sessionId: session.id,
+          sessionTitle: ref.title || session.title || '',
+          isChildSession: childIds.has(session.id),
+          requestIndex,
+        },
+      });
+    }
+
+    for (const record of toolRecords(session)) {
+      if (!record.name) continue;
+      const text = toolText(record);
       const base = {
         sessionId: session.id,
-        sessionTitle: session.title,
-        parentId: session.parentId,
-        isChildSession: session.id !== rootId,
-        role,
-        messageId: row.message_id,
-        sessionMessageId: `${session.id}:${row.message_id}`,
-        partId: row.id,
+        sessionTitle: ref.title || session.title || '',
+        isChildSession: childIds.has(session.id),
         requestIndex,
+        status: record.result ? (record.result.error ? 'failed' : 'completed') : 'unknown',
+        input: objectOrEmpty(record.input),
       };
-
-      if (data.type === 'text') {
-        if (role === 'user') requestIndex += 1;
-        events.push({
-          type: 'message',
-          name: role,
-          at,
-          source: `opencode:${session.id}`,
-          text: data.text || '',
-          data: { ...base, requestIndex },
-        });
-        continue;
-      }
-
-      if (data.type === 'tool') {
-        const input = objectOrEmpty(data.state?.input);
-        const metadata = objectOrEmpty(data.state?.metadata);
-        const toolName = data.tool || 'unknown';
-        const text = toolText(toolName, input, metadata, data.state);
-        const toolEvent = {
-          type: 'tool_call',
-          name: toolName,
-          at,
-          source: `opencode:${session.id}`,
-          text,
-          data: {
-            ...base,
-            tool: toolName,
-            status: stringValue(data.state?.status),
-            input,
-            metadata,
-          },
-        };
-        events.push(toolEvent);
-        events.push(...derivedToolEvents(toolEvent));
-      }
+      const event = {
+        type: 'tool_call',
+        name: record.name,
+        at: record.at,
+        source: `${ref.source.harness}:${session.id}`,
+        text,
+        data: base,
+      };
+      events.push(event);
+      events.push(...derivedToolEvents(event));
     }
   }
 
@@ -286,26 +194,14 @@ function runsCommand(text, pattern) {
   return /(^|[\s"])(bash|shell|exec|command|terminal|run_command)\b/i.test(text) && pattern.test(text);
 }
 
-function toolText(toolName, input, metadata, state) {
-  const fragments = [toolName, safeJson(input), safeJson(metadata)];
-  if (state?.output && typeof state.output === 'string') fragments.push(state.output);
-  return fragments.filter(Boolean).join('\n');
-}
-
-function objectOrEmpty(value) {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-}
-
-function stringValue(value) {
-  return typeof value === 'string' ? value : value == null ? '' : String(value);
-}
-
-function safeJson(value) {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return '';
-  }
+function toolText(record) {
+  const fragments = [
+    record.name,
+    safeJson(record.input),
+    record.result?.output || '',
+    record.result?.error || '',
+  ];
+  return redactSecrets(fragments.filter(Boolean).join('\n'));
 }
 
 function printablePath(path) {
@@ -313,8 +209,8 @@ function printablePath(path) {
   return rel && !rel.startsWith('..') ? rel : path;
 }
 
-function printAudit({ selected, includedSessions, policy, result }) {
-  const children = includedSessions.length - 1;
+function printAudit({ selected, includedRefs, policy, result }) {
+  const children = includedRefs.length - 1;
   console.log(`session: ${selected.id}${selected.title ? ` (${selected.title})` : ''}`);
   if (children > 0) console.log(`children: ${children}`);
   console.log(`policy:  ${printablePath(policy.sourcePath || defaultPolicyPath())}`);
@@ -356,36 +252,64 @@ async function main() {
       console.error(`job-forge guard:audit: ${opts.error}`);
       return 2;
     }
-    const refs = discoverSessions(opts, { includeAllForShow: Boolean(positional[0] && positional[0] !== 'latest') });
+
+    const refs = await discoverProjectSessions(opts);
     if (refs.length === 0) {
-      console.error('job-forge guard:audit: no OpenCode sessions found for this project');
+      console.error('job-forge guard:audit: no sessions found for this project');
       return 2;
     }
-    const selected = selectSession(refs, positional);
+
+    const sessionsById = new Map();
+    const loadErrors = new Map();
+    for (const ref of refs) {
+      try {
+        sessionsById.set(ref.id, loadObservedSession(ref));
+      } catch (error) {
+        loadErrors.set(ref.id, error instanceof Error ? error.message : String(error));
+      }
+    }
+    const loadedRefs = refs.filter((ref) => sessionsById.has(ref.id));
+    const graph = buildSessionGraph(loadedRefs, sessionsById);
+    const selected = selectSession(loadedRefs, graph.roots, positional);
     if (!selected) {
-      console.error(`job-forge guard:audit: no OpenCode session matches "${positional[0]}"`);
+      console.error(`job-forge guard:audit: no session matches "${positional[0]}"`);
       return 2;
     }
-    const includedSessions = sessionsForAudit(selected, refs, opts.includeChildren);
+    if (!sessionsById.has(selected.id)) {
+      console.error(`job-forge guard:audit: could not load session "${selected.id}": ${loadErrors.get(selected.id) || 'unknown parse error'}`);
+      return 2;
+    }
+
+    const includedIds = opts.includeChildren
+      ? [selected.id, ...descendantIds(selected.id, graph.childrenBySession)]
+      : [selected.id];
+    const childIds = new Set(includedIds.slice(1));
+    const includedRefs = includedIds
+      .map((id) => loadedRefs.find((ref) => ref.id === id))
+      .filter(Boolean);
+    const sessionEntries = includedRefs.map((ref) => ({
+      ref,
+      session: sessionsById.get(ref.id),
+    })).filter((entry) => entry.session);
     const policy = loadPolicy(opts.policy);
-    const events = buildGuardEvents(includedSessions);
+    const events = buildGuardEvents(sessionEntries, childIds);
     const result = audit(policy, events);
 
     if (opts.json) {
       console.log(JSON.stringify({
         session: selected,
-        includedSessions: includedSessions.map((session) => ({
-          id: session.id,
-          parentId: session.parentId,
-          title: session.title,
-          startedAt: session.startedAt,
-          endedAt: session.endedAt,
+        includedSessions: includedRefs.map((ref) => ({
+          id: ref.id,
+          title: ref.title,
+          startedAt: ref.startedAt,
+          endedAt: ref.endedAt,
+          harness: ref.source.harness,
         })),
         policy: policy.sourcePath,
         result,
       }, null, 2));
     } else {
-      printAudit({ selected, includedSessions, policy, result });
+      printAudit({ selected, includedRefs, policy, result });
     }
     return resultFails(result, opts.failOn) ? 1 : 0;
   }

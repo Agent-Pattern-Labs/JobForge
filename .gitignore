@@ -52,7 +52,9 @@ node_modules/
 /.cursor/mcp.json
 /.cursor/rules/
 /.cursor/iso-route.md
+/.pi/
 /.opencode/agents/
+/.opencode/instructions.md
 /.opencode/skills/
 /.opencode/opencode-model-fallback.json
 /opencode.json

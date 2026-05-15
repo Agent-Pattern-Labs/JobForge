@@ -1,6 +1,6 @@
 # Batch evaluation
 
-The `batch/` folder holds the **parallel batch runner** for processing 10+ job URLs with headless `opencode run` workers. For how batch fits into the rest of JobForge, see [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
+The `batch/` folder holds the **parallel batch runner** for processing 10+ job URLs with headless AI CLI workers (`opencode run` or `codex exec`). For how batch fits into the rest of JobForge, see [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
 
 ## What ships in git
 
@@ -16,10 +16,11 @@ Per [`.gitignore`](../.gitignore): `batch-input.tsv`, `batch-state.tsv`, `logs/*
 
 The default runner uses `@razroo/iso-orchestrator` through
 `scripts/batch-orchestrator.mjs`. It persists bundle steps and events in
-`.jobforge-runs/`, caps worker fan-out with `workflow.forEach`, and serializes
-state/report-number writes while parallel bundles run. Use
-`JOBFORGE_LEGACY_BATCH_RUNNER=1 ./batch/batch-runner.sh` only to fall back to
-the old shell loop.
+`.jobforge-runs/`, caps worker fan-out with `workflow.forEach`, serializes
+state/report-number writes while parallel bundles run, and records worker
+leases/heartbeats for liveness inspection. Use `./batch/batch-runner.sh --runner codex`
+to switch the worker CLI, or `JOBFORGE_LEGACY_BATCH_RUNNER=1 ./batch/batch-runner.sh`
+only to fall back to the old shell loop.
 
 ## Input: `batch-input.tsv`
 
@@ -64,4 +65,4 @@ After a successful merge, each processed file is moved to **`batch/tracker-addit
 
 ## Prerequisites
 
-The runner expects the `opencode` CLI on `PATH` and a valid `batch-prompt.md`. It creates `reports/` and tracker paths when they do not exist; ensure your usual JobForge setup (`cv.md`, `config/profile.yml`, `portals.yml`) matches what `batch-prompt.md` assumes.
+The runner expects the selected worker CLI (`opencode` by default, `codex` when `--runner codex` is used) on `PATH` and a valid `batch-prompt.md`. It creates `reports/` and tracker paths when they do not exist; ensure your usual JobForge setup (`cv.md`, `config/profile.yml`, `portals.yml`) matches what `batch-prompt.md` assumes.

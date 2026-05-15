@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(process.argv[2] ?? ".");
 const files = {
   instructions: readFileSync(resolve(root, "iso/instructions.md"), "utf8"),
+  instructionsOpencode: readFileSync(resolve(root, "iso/instructions.opencode.md"), "utf8"),
   helpers: readFileSync(resolve(root, "modes/reference-local-helpers.md"), "utf8"),
   apply: readFileSync(resolve(root, "modes/apply.md"), "utf8"),
   models: readFileSync(resolve(root, "models.yaml"), "utf8"),
@@ -21,6 +22,7 @@ const checks = [
   ["H6 requires merge and verify", () => every(files.instructions, ["batch/tracker-additions/*.tsv", "npx job-forge merge", "npx job-forge verify"])],
   ["H7 distrusts subagent prose", () => every(files.instructions, ["must originate from a file", "not from prior subagent prose"])],
   ["H8 keeps proxy secret and requires stealth", () => every(files.instructions, ["[H8]", "Do not transcribe `server`, `username`, `password`, or `bypass`", "`stealth: true`"])],
+  ["OpenCode addendum exists for task semantics", () => every(files.instructionsOpencode, ["OpenCode", "`task`", "launch acknowledgement", "Do not use `task` to poll status"])],
   ["root points to consolidated helper reference", () => every(files.instructions, ["[D8]", "modes/reference-local-helpers.md", "deterministic local helpers"])],
   ["helper reference covers score/timeline/prioritize/lineage", () => every(files.helpers, ["templates/score.json", "npx job-forge score:*", "templates/timeline.json", "npx job-forge timeline:*", "templates/prioritize.json", "npx job-forge prioritize:*", ".jobforge-lineage.json", "npx job-forge lineage:*"])],
   ["root helper defaults are consolidated", () => !/\[D(?:9|1\d|2[0-9])\]/.test(files.instructions)],

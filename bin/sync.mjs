@@ -20,7 +20,7 @@
  * whether the cwd contains the harness's own package.json with name=job-forge).
  */
 
-import { existsSync, lstatSync, readlinkSync, symlinkSync, mkdirSync, readFileSync } from 'fs';
+import { existsSync, lstatSync, readlinkSync, symlinkSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join, resolve, relative } from 'path';
 import { fileURLToPath } from 'url';
 import {
@@ -80,6 +80,7 @@ const links = [
 
   // OpenCode: skill router + subagent definitions. Users can override any
   // single subagent by replacing its symlink with a local file.
+  { src: '.opencode/instructions.md',      dst: '.opencode/instructions.md' },
   { src: '.opencode/skills/job-forge.md',  dst: '.opencode/skills/job-forge.md' },
   { src: '.opencode/agents',               dst: '.opencode/agents' },
 
@@ -155,6 +156,15 @@ for (const { src, dst } of links) {
 }
 
 try {
+  if (ensureOpencodeInstructionRef()) {
+    created++;
+  }
+} catch (error) {
+  console.warn(`  warn: failed to patch opencode.json instructions: ${error instanceof Error ? error.message : String(error)}`);
+  warned++;
+}
+
+try {
   const migrationResult = applyConsumerMigrations();
   if (migrationResult?.changeCount > 0) {
     console.log(`\njob-forge migrate: applied ${migrationResult.changeCount} change(s)`);
@@ -165,6 +175,30 @@ try {
 }
 
 console.log(`\njob-forge sync: ${created} created, ${skipped} up-to-date, ${warned} warnings (project: ${PROJECT_DIR})`);
+
+function ensureOpencodeInstructionRef() {
+  const configPath = join(PROJECT_DIR, 'opencode.json');
+  if (!existsSync(configPath)) return false;
+
+  const raw = readFileSync(configPath, 'utf8');
+  const config = JSON.parse(raw);
+  const current = Array.isArray(config.instructions)
+    ? config.instructions.slice()
+    : config.instructions
+      ? [config.instructions]
+      : [];
+  const required = '.opencode/instructions.md';
+  if (current.includes(required)) return false;
+
+  const next = current.slice();
+  const anchor = next.indexOf('AGENTS.harness.md');
+  if (anchor === -1) next.unshift(required);
+  else next.splice(anchor + 1, 0, required);
+  config.instructions = [...new Set(next)];
+  writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+  console.log(`  updated: opencode.json instructions += ${required}`);
+  return true;
+}
 
 function applyConsumerMigrations() {
   const skip = process.env.JOB_FORGE_SKIP_MIGRATIONS;

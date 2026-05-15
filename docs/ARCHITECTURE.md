@@ -134,14 +134,14 @@ For customization (archetypes, weights, tone), start with `_shared.md` and [CUST
 The batch system processes multiple offers in parallel:
 
 ```
-batch-input.tsv    ->  batch-runner.sh  ->  N x opencode run workers
-(id, url, source, notes) (iso-orchestrator) (self-contained prompt)
+batch-input.tsv    ->  batch-runner.sh  ->  N x AI CLI workers
+(id, url, source, notes) (iso-orchestrator) (opencode run / codex exec)
                            |
                     batch-state.tsv + .jobforge-runs/
                     (progress + durable workflow record)
 ```
 
-Each worker is a headless opencode instance (`opencode run`) that receives the full `batch-prompt.md` as context. Workers produce:
+Each worker is a headless CLI agent (`opencode run` or `codex exec`) that receives the full `batch-prompt.md` context. Workers produce:
 - Report .md
 - PDF
 - Tracker TSV line
@@ -149,8 +149,9 @@ Each worker is a headless opencode instance (`opencode run`) that receives the f
 The orchestrator manages parallelism, state, retries, and resume. The default
 runner delegates to `scripts/batch-orchestrator.mjs`, which uses
 `@razroo/iso-orchestrator` for bounded bundle fan-out, idempotent bundle steps,
-and mutexed report-number/state writes. Set `JOBFORGE_LEGACY_BATCH_RUNNER=1`
-only if you need the old shell loop.
+mutexed report-number/state writes, and worker leases/heartbeats. Pass
+`--runner codex` to use Codex workers instead of OpenCode. Set
+`JOBFORGE_LEGACY_BATCH_RUNNER=1` only if you need the old shell loop.
 
 **Local batch artifacts:** `batch/batch-input.tsv`, `batch/batch-state.tsv`, `batch/logs/`, `batch/tracker-additions/*.tsv`, and `.jobforge-runs/` are created when you run the runner; they are gitignored (with `.gitkeep` in `batch/logs/` and `batch/tracker-additions/`). A fresh clone ships `batch/batch-runner.sh` and `batch/batch-prompt.md` only until you add an input file — see [`batch/README.md`](../batch/README.md) and `batch/batch-runner.sh --help` for the TSV layout and workflow.
 
@@ -247,9 +248,9 @@ Scripts maintain data consistency. In a consumer project they're invoked via the
 | `generate-pdf.mjs` | `npx job-forge pdf` | Renders HTML to PDF via Geometra MCP (`geometra_generate_pdf`) or standalone Playwright/Chromium (`npx job-forge pdf <input.html> <output.pdf>`) |
 | `cv-sync-check.mjs` | `npx job-forge sync-check` | Setup lint: `cv.md` + `config/profile.yml`, hardcoded-metric scan on `modes/_shared.md` and `batch/batch-prompt.md`, optional `article-digest.md` freshness |
 | `scripts/token-usage-report.mjs` | `npx job-forge tokens` | Per-session opencode token/cost report from the SQLite DB |
-| `scripts/trace.mjs` | `npx job-forge trace:list` / `trace:stats` / `trace:show` | Local transcript observability via `@razroo/iso-trace`; common commands default to OpenCode sessions for the consumer project |
-| `scripts/telemetry.mjs` | `npx job-forge telemetry:status` / `telemetry:show` | JobForge operational telemetry derived from OpenCode traces plus tracker TSV state |
-| `scripts/guard.mjs` | `npx job-forge guard:audit` / `guard:explain` | Deterministic `@razroo/iso-guard` policy audits over local OpenCode traces |
+| `scripts/trace.mjs` | `npx job-forge trace:list` / `trace:stats` / `trace:show` | Local transcript observability via `@razroo/iso-trace`; common commands default to project-local sessions across supported harnesses |
+| `scripts/telemetry.mjs` | `npx job-forge telemetry:status` / `telemetry:show` | JobForge operational telemetry derived from normalized local traces plus tracker TSV state |
+| `scripts/guard.mjs` | `npx job-forge guard:audit` / `guard:explain` | Deterministic `@razroo/iso-guard` policy audits over local normalized traces (with OpenCode `task` rules still available where relevant) |
 | `scripts/ledger.mjs` | `npx job-forge ledger:status` / `ledger:has` / `ledger:rebuild` | Deterministic `@razroo/iso-ledger` state over tracker, TSV, and pipeline files |
 | `scripts/capabilities.mjs` | `npx job-forge capabilities:check` / `capabilities:explain` | Deterministic `@razroo/iso-capabilities` role boundary checks for tools, MCPs, commands, filesystem, and network access |
 | `scripts/cache.mjs` | `npx job-forge cache:has` / `cache:get` / `cache:put` | Deterministic `@razroo/iso-cache` JD and artifact reuse keyed by stable job/url inputs |
