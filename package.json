@@ -1,6 +1,6 @@
 {
   "name": "job-forge",
-  "version": "2.14.37",
+  "version": "2.14.38",
   "description": "AI-powered job search pipeline built on opencode",
   "type": "module",
   "bin": {
