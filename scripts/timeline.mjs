@@ -7,7 +7,7 @@ import {
   formatConfigSummary,
   formatTimelineResult,
   formatVerifyResult,
-} from '@razroo/iso-timeline';
+} from '@agent-pattern-labs/iso-timeline';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   buildJobForgeTimeline,

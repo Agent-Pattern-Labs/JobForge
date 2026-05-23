@@ -27,7 +27,7 @@ import {
   loadMigrationConfig,
   parseJson,
   runMigrations,
-} from '@razroo/iso-migrate';
+} from '@agent-pattern-labs/iso-migrate';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(__dirname, '..');

@@ -9,7 +9,7 @@ JobForge ships on npm as [`job-forge`](https://www.npmjs.com/package/job-forge) 
 | Path | Who it's for | How |
 |------|--------------|-----|
 | **A — Scaffold a personal project** | Most users. You want a job search project with the harness in `node_modules`, updatable via `npm update job-forge`. | `npx --package=job-forge create-job-forge my-search && cd my-search && npm install` |
-| **B — Clone the harness directly** | Contributors and hackers working on `iso/`, modes, scripts, or the scoring model. Personal files are gitignored. | `git clone https://github.com/razroo/JobForge.git && cd JobForge && npm install && npm run build:config` |
+| **B — Clone the harness directly** | Contributors and hackers working on `iso/`, modes, scripts, or the scoring model. Personal files are gitignored. | `git clone https://github.com/Agent-Pattern-Labs/JobForge.git && cd JobForge && npm install && npm run build:config` |
 
 See [SETUP.md](SETUP.md) for both paths.
 

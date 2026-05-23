@@ -5,7 +5,7 @@ import {
   formatCanonResult,
   formatCompareResult,
   formatConfigSummary,
-} from '@razroo/iso-canon';
+} from '@agent-pattern-labs/iso-canon';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   canonicalizeJobForgeEntity,

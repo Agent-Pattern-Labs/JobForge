@@ -17,29 +17,29 @@ const migrationScripts = migrationValue('jobforge-managed-scripts', '/scripts');
 const migrationIgnores = migrationValue('jobforge-generated-ignores');
 
 const groups = [
-  helper('trace', '@razroo/iso-trace', ['list', 'stats', 'show']),
+  helper('trace', '@agent-pattern-labs/iso-trace', ['list', 'stats', 'show']),
   helper('telemetry', '', ['list', 'status', 'show', 'watch']),
-  helper('guard', '@razroo/iso-guard', ['audit', 'explain'], { template: 'templates/guards/jobforge-baseline.yaml' }),
-  helper('ledger', '@razroo/iso-ledger', ['status', 'rebuild', 'verify', 'has', 'query'], { artifacts: ['.jobforge-ledger/'] }),
-  helper('capabilities', '@razroo/iso-capabilities', ['list', 'explain', 'check', 'render'], { template: 'templates/capabilities.json', migrated: true }),
-  helper('context', '@razroo/iso-context', ['list', 'explain', 'plan', 'check', 'render'], { template: 'templates/context.json', migrated: true }),
-  helper('cache', '@razroo/iso-cache', ['key', 'has', 'get', 'put', 'status', 'list', 'verify', 'prune'], { artifacts: ['.jobforge-cache/'], migrated: true }),
-  helper('index', '@razroo/iso-index', ['build', 'status', 'query', 'has', 'verify', 'explain'], { template: 'templates/index.json', artifacts: ['.jobforge-index.json'], migrated: true }),
-  helper('facts', '@razroo/iso-facts', ['build', 'status', 'verify', 'check', 'has', 'query', 'explain'], { template: 'templates/facts.json', artifacts: ['.jobforge-facts.json'], migrated: true }),
-  helper('score', '@razroo/iso-score', ['compute', 'verify', 'check', 'gate', 'compare', 'explain'], { template: 'templates/score.json', migrated: true }),
-  helper('canon', '@razroo/iso-canon', ['normalize', 'key', 'compare', 'explain'], { template: 'templates/canon.json', migrated: true }),
-  helper('preflight', '@razroo/iso-preflight', ['plan', 'check', 'explain'], { template: 'templates/preflight.json', artifacts: ['batch/preflight-candidates.json', 'batch/preflight-plan.json'], migrated: true }),
-  helper('postflight', '@razroo/iso-postflight', ['status', 'check', 'explain'], { template: 'templates/postflight.json', artifacts: ['batch/postflight-outcomes.json'], migrated: true }),
-  helper('timeline', '@razroo/iso-timeline', ['status', 'build', 'plan', 'due', 'check', 'verify', 'explain'], { template: 'templates/timeline.json', artifacts: ['.jobforge-timeline.json', '.jobforge-timeline-events.jsonl', 'data/timeline-events.jsonl'], migrated: true }),
-  helper('prioritize', '@razroo/iso-prioritize', ['status', 'items', 'build', 'rank', 'select', 'check', 'verify', 'explain'], { template: 'templates/prioritize.json', artifacts: ['.jobforge-prioritize.json', '.jobforge-prioritize-items.json'], migrated: true }),
-  helper('lineage', '@razroo/iso-lineage', ['status', 'record', 'check', 'stale', 'verify', 'explain'], { artifacts: ['.jobforge-lineage.json'], migrated: true }),
-  helper('redact', '@razroo/iso-redact', ['scan', 'verify', 'apply', 'explain'], { template: 'templates/redact.json', artifacts: ['.jobforge-redacted/'], migrated: true }),
-  helper('migrate', '@razroo/iso-migrate', ['plan', 'apply', 'check', 'explain'], { template: 'templates/migrations.json', migrated: true }),
+  helper('guard', '@agent-pattern-labs/iso-guard', ['audit', 'explain'], { template: 'templates/guards/jobforge-baseline.yaml' }),
+  helper('ledger', '@agent-pattern-labs/iso-ledger', ['status', 'rebuild', 'verify', 'has', 'query'], { artifacts: ['.jobforge-ledger/'] }),
+  helper('capabilities', '@agent-pattern-labs/iso-capabilities', ['list', 'explain', 'check', 'render'], { template: 'templates/capabilities.json', migrated: true }),
+  helper('context', '@agent-pattern-labs/iso-context', ['list', 'explain', 'plan', 'check', 'render'], { template: 'templates/context.json', migrated: true }),
+  helper('cache', '@agent-pattern-labs/iso-cache', ['key', 'has', 'get', 'put', 'status', 'list', 'verify', 'prune'], { artifacts: ['.jobforge-cache/'], migrated: true }),
+  helper('index', '@agent-pattern-labs/iso-index', ['build', 'status', 'query', 'has', 'verify', 'explain'], { template: 'templates/index.json', artifacts: ['.jobforge-index.json'], migrated: true }),
+  helper('facts', '@agent-pattern-labs/iso-facts', ['build', 'status', 'verify', 'check', 'has', 'query', 'explain'], { template: 'templates/facts.json', artifacts: ['.jobforge-facts.json'], migrated: true }),
+  helper('score', '@agent-pattern-labs/iso-score', ['compute', 'verify', 'check', 'gate', 'compare', 'explain'], { template: 'templates/score.json', migrated: true }),
+  helper('canon', '@agent-pattern-labs/iso-canon', ['normalize', 'key', 'compare', 'explain'], { template: 'templates/canon.json', migrated: true }),
+  helper('preflight', '@agent-pattern-labs/iso-preflight', ['plan', 'check', 'explain'], { template: 'templates/preflight.json', artifacts: ['batch/preflight-candidates.json', 'batch/preflight-plan.json'], migrated: true }),
+  helper('postflight', '@agent-pattern-labs/iso-postflight', ['status', 'check', 'explain'], { template: 'templates/postflight.json', artifacts: ['batch/postflight-outcomes.json'], migrated: true }),
+  helper('timeline', '@agent-pattern-labs/iso-timeline', ['status', 'build', 'plan', 'due', 'check', 'verify', 'explain'], { template: 'templates/timeline.json', artifacts: ['.jobforge-timeline.json', '.jobforge-timeline-events.jsonl', 'data/timeline-events.jsonl'], migrated: true }),
+  helper('prioritize', '@agent-pattern-labs/iso-prioritize', ['status', 'items', 'build', 'rank', 'select', 'check', 'verify', 'explain'], { template: 'templates/prioritize.json', artifacts: ['.jobforge-prioritize.json', '.jobforge-prioritize-items.json'], migrated: true }),
+  helper('lineage', '@agent-pattern-labs/iso-lineage', ['status', 'record', 'check', 'stale', 'verify', 'explain'], { artifacts: ['.jobforge-lineage.json'], migrated: true }),
+  helper('redact', '@agent-pattern-labs/iso-redact', ['scan', 'verify', 'apply', 'explain'], { template: 'templates/redact.json', artifacts: ['.jobforge-redacted/'], migrated: true }),
+  helper('migrate', '@agent-pattern-labs/iso-migrate', ['plan', 'apply', 'check', 'explain'], { template: 'templates/migrations.json', migrated: true }),
 ];
 
 const packageOnly = [
-  { id: 'contract', pkg: '@razroo/iso-contract', template: 'templates/contracts.json', needles: ['templates/contracts.json', 'tracker-line'] },
-  { id: 'orchestrator', pkg: '@razroo/iso-orchestrator', file: 'scripts/batch-orchestrator.mjs', needles: ['iso-orchestrator'] },
+  { id: 'contract', pkg: '@agent-pattern-labs/iso-contract', template: 'templates/contracts.json', needles: ['templates/contracts.json', 'tracker-line'] },
+  { id: 'orchestrator', pkg: '@agent-pattern-labs/iso-orchestrator', file: 'scripts/batch-orchestrator.mjs', needles: ['iso-orchestrator'] },
 ];
 
 const errors = [];

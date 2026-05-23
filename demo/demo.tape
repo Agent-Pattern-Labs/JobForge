@@ -228,6 +228,6 @@ Sleep 500ms
 Type "# JobForge: Evaluate. Apply. Land."
 Enter
 Sleep 1s
-Type "# github.com/razroo/JobForge"
+Type "# github.com/Agent-Pattern-Labs/JobForge"
 Enter
 Sleep 3s

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/razroo/JobForge/dashboard/internal/model"
+	"github.com/Agent-Pattern-Labs/JobForge/dashboard/internal/model"
 )
 
 var (

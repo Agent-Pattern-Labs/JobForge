@@ -8,7 +8,7 @@ import {
   loadPreflightConfig,
   parseJson,
   planPreflight,
-} from '@razroo/iso-preflight';
+} from '@agent-pattern-labs/iso-preflight';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   jobForgePreflightConfigPath,

@@ -9,9 +9,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/razroo/JobForge/dashboard/internal/data"
-	"github.com/razroo/JobForge/dashboard/internal/theme"
-	"github.com/razroo/JobForge/dashboard/internal/ui/screens"
+	"github.com/Agent-Pattern-Labs/JobForge/dashboard/internal/data"
+	"github.com/Agent-Pattern-Labs/JobForge/dashboard/internal/theme"
+	"github.com/Agent-Pattern-Labs/JobForge/dashboard/internal/ui/screens"
 )
 
 type viewState int

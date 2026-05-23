@@ -1,6 +1,6 @@
 {
   "name": "job-forge",
-  "version": "2.14.38",
+  "version": "2.14.39",
   "description": "AI-powered job search pipeline built on opencode",
   "type": "module",
   "bin": {
@@ -167,7 +167,7 @@
   "author": "Charlie Greenman",
   "repository": {
     "type": "git",
-    "url": "https://github.com/razroo/JobForge"
+    "url": "git+https://github.com/Agent-Pattern-Labs/JobForge.git"
   },
   "license": "MIT",
   "engines": {
@@ -177,32 +177,32 @@
     "fast-uri": "3.1.2"
   },
   "dependencies": {
-    "@razroo/iso-cache": "^0.1.0",
-    "@razroo/iso-canon": "^0.1.0",
-    "@razroo/iso-capabilities": "^0.1.0",
-    "@razroo/iso-context": "^0.1.0",
-    "@razroo/iso-contract": "^0.1.0",
-    "@razroo/iso-facts": "^0.1.0",
-    "@razroo/iso-guard": "^0.1.0",
-    "@razroo/iso-index": "^0.1.0",
-    "@razroo/iso-ledger": "^0.1.0",
-    "@razroo/iso-lineage": "^0.1.0",
-    "@razroo/iso-migrate": "^0.1.0",
-    "@razroo/iso-orchestrator": "^0.2.0",
-    "@razroo/iso-postflight": "^0.1.0",
-    "@razroo/iso-preflight": "^0.1.0",
-    "@razroo/iso-prioritize": "^0.1.0",
-    "@razroo/iso-redact": "^0.1.0",
-    "@razroo/iso-score": "^0.1.0",
-    "@razroo/iso-timeline": "^0.1.0",
-    "@razroo/iso-trace": "^0.5.0",
+    "@agent-pattern-labs/iso-cache": "^0.1.1",
+    "@agent-pattern-labs/iso-canon": "^0.1.1",
+    "@agent-pattern-labs/iso-capabilities": "^0.1.1",
+    "@agent-pattern-labs/iso-context": "^0.1.1",
+    "@agent-pattern-labs/iso-contract": "^0.1.1",
+    "@agent-pattern-labs/iso-facts": "^0.1.1",
+    "@agent-pattern-labs/iso-guard": "^0.1.1",
+    "@agent-pattern-labs/iso-index": "^0.1.1",
+    "@agent-pattern-labs/iso-ledger": "^0.1.1",
+    "@agent-pattern-labs/iso-lineage": "^0.1.1",
+    "@agent-pattern-labs/iso-migrate": "^0.1.1",
+    "@agent-pattern-labs/iso-orchestrator": "^0.2.1",
+    "@agent-pattern-labs/iso-postflight": "^0.1.1",
+    "@agent-pattern-labs/iso-preflight": "^0.1.1",
+    "@agent-pattern-labs/iso-prioritize": "^0.1.1",
+    "@agent-pattern-labs/iso-redact": "^0.1.1",
+    "@agent-pattern-labs/iso-score": "^0.1.1",
+    "@agent-pattern-labs/iso-timeline": "^0.1.1",
+    "@agent-pattern-labs/iso-trace": "^0.5.1",
     "playwright": "^1.58.1"
   },
   "devDependencies": {
-    "@razroo/agentmd": "^0.3.0",
-    "@razroo/iso": "^0.3.1",
-    "@razroo/iso-eval": "^0.4.0",
-    "@razroo/iso-harness": "^0.8.0",
-    "@razroo/iso-route": "^0.5.3"
+    "@agent-pattern-labs/agentmd": "^0.3.1",
+    "@agent-pattern-labs/iso": "^0.3.2",
+    "@agent-pattern-labs/iso-eval": "^0.4.1",
+    "@agent-pattern-labs/iso-harness": "^0.8.1",
+    "@agent-pattern-labs/iso-route": "^0.6.1"
   }
 }

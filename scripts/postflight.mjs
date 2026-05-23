@@ -8,7 +8,7 @@ import {
   loadPostflightConfig,
   parseJson,
   settlePostflight,
-} from '@razroo/iso-postflight';
+} from '@agent-pattern-labs/iso-postflight';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   jobForgePostflightConfigPath,

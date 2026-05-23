@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/razroo/JobForge/dashboard/internal/theme"
+	"github.com/Agent-Pattern-Labs/JobForge/dashboard/internal/theme"
 )
 
 // ViewerClosedMsg is emitted when the viewer is dismissed.

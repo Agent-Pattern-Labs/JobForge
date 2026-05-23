@@ -6,7 +6,7 @@ import {
   formatConfigSummary,
   formatIndexRecords,
   formatVerifyResult,
-} from '@razroo/iso-index';
+} from '@agent-pattern-labs/iso-index';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   buildJobForgeIndex,

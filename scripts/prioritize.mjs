@@ -9,7 +9,7 @@ import {
   formatVerifyResult,
   loadPrioritizeItems,
   parseJson,
-} from '@razroo/iso-prioritize';
+} from '@agent-pattern-labs/iso-prioritize';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   buildJobForgePrioritizeItems,

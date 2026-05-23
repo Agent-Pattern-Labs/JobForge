@@ -9,7 +9,7 @@ import {
   formatGateResult,
   formatScoreResult,
   formatVerifyResult,
-} from '@razroo/iso-score';
+} from '@agent-pattern-labs/iso-score';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   checkJobForgeScore,

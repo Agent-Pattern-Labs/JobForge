@@ -4,7 +4,7 @@ import { relative } from 'path';
 import {
   formatConfigSummary,
   formatMigrationResult,
-} from '@razroo/iso-migrate';
+} from '@agent-pattern-labs/iso-migrate';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   jobForgeMigrationConfigPath,

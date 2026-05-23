@@ -68,7 +68,7 @@ batch/batch-runner.sh [OPTIONS]
 ```
 
 `batch-runner.sh` delegates to `scripts/batch-orchestrator.mjs` by default.
-That Node runner uses `@razroo/iso-orchestrator` to persist workflow records in
+That Node runner uses `@agent-pattern-labs/iso-orchestrator` to persist workflow records in
 `.jobforge-runs/`, cap bundle fan-out with `workflow.forEach`, and serialize
 report-number/state writes while workers run in parallel. If a regression
 requires the old shell loop, run with `JOBFORGE_LEGACY_BATCH_RUNNER=1`.

@@ -6,7 +6,7 @@ import {
   formatEvents,
   formatVerifyResult,
   queryEvents,
-} from '@razroo/iso-ledger';
+} from '@agent-pattern-labs/iso-ledger';
 import { PROJECT_DIR, readAllEntries } from '../tracker-lib.mjs';
 import {
   appendJobForgeEvent,

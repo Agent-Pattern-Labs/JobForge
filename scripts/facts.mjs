@@ -7,7 +7,7 @@ import {
   formatConfigSummary,
   formatFacts,
   formatVerifyResult,
-} from '@razroo/iso-facts';
+} from '@agent-pattern-labs/iso-facts';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   buildJobForgeFacts,

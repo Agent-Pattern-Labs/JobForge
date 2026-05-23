@@ -8,7 +8,7 @@ import {
   formatStaleResult,
   formatVerifyResult,
   parseJson,
-} from '@razroo/iso-lineage';
+} from '@agent-pattern-labs/iso-lineage';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   checkJobForgeLineage,

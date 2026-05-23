@@ -4,7 +4,7 @@
 
 JobForge ships as an npm package at [`job-forge`](https://www.npmjs.com/package/job-forge). There are two kinds of repo involved:
 
-- **Harness** — this repo, `razroo/JobForge`. Published to npm. Contains `iso/` (single source of truth), modes, scripts, skill router, templates, fonts, dashboard, and bin entries. Per-harness config trees are **generated** from `iso/` by [`@razroo/iso-harness`](https://www.npmjs.com/package/@razroo/iso-harness) — gitignored here, baked into the tarball by `prepack` at publish time, and landed in consumer projects via symlinks.
+- **Harness** — this repo, `Agent-Pattern-Labs/JobForge`. Published to npm. Contains `iso/` (single source of truth), modes, scripts, skill router, templates, fonts, dashboard, and bin entries. Per-harness config trees are **generated** from `iso/` by [`@agent-pattern-labs/iso-harness`](https://www.npmjs.com/package/@agent-pattern-labs/iso-harness) — gitignored here, baked into the tarball by `prepack` at publish time, and landed in consumer projects via symlinks.
 - **Consumer project** — what users interact with day-to-day. Scaffolded via `npx --package=job-forge create-job-forge <dir>`, or hand-authored with `job-forge` listed in `package.json` dependencies.
 
 The consumer's project root contains personal data plus symlinks into `node_modules/job-forge/`:
@@ -148,7 +148,7 @@ Each worker is a headless CLI agent (`opencode run` or `codex exec`) that receiv
 
 The orchestrator manages parallelism, state, retries, and resume. The default
 runner delegates to `scripts/batch-orchestrator.mjs`, which uses
-`@razroo/iso-orchestrator` for bounded bundle fan-out, idempotent bundle steps,
+`@agent-pattern-labs/iso-orchestrator` for bounded bundle fan-out, idempotent bundle steps,
 mutexed report-number/state writes, and worker leases/heartbeats. Pass
 `--runner codex` to use Codex workers instead of OpenCode. Set
 `JOBFORGE_LEGACY_BATCH_RUNNER=1` only if you need the old shell loop.
@@ -235,7 +235,7 @@ When the tracker file is missing, checks 1-6 and 8 are skipped; checks 7, 9, 10,
 
 Prefer one focused change per pull request: a single mode under `modes/`, one repository-root `.mjs` utility, documentation under `docs/`, fictional samples under [`examples/`](../examples/README.md), templates such as [`templates/portals.example.yml`](../templates/portals.example.yml), the batch flow described in [`batch/README.md`](../batch/README.md), or the Go TUI under `dashboard/` — not a repo-wide refactor across 3+ of those at once. Branch workflow, the verify + dashboard build gate, and starter ideas are in [CONTRIBUTING.md](../CONTRIBUTING.md) (**What to Contribute** and **Development**). To look for in-repo `TODO`, `FIXME`, or `HACK` markers before choosing a task, use the `rg` one-liner in [CONTRIBUTING.md — Optional: scripted agent iterations](../CONTRIBUTING.md#optional-scripted-agent-iterations). Upstream PRs MUST stay generic: do not commit real candidate data (`cv.md`, `config/profile.yml`, personalized `portals.yml`, `data/applications.md`, `reports/`, or similar paths called out in CONTRIBUTING and `.gitignore`).
 
-**PR / maintainer gate:** Before opening a pull request against `razroo/JobForge`, run `npm run verify`, `npm run smoke:iso`, and `npm run build:dashboard` (or `(cd dashboard && go build .)`) from the harness repo root (same as [CONTRIBUTING.md](../CONTRIBUTING.md#development)). `smoke:iso` includes `npm run lint:helpers`, which prevents local helper dependencies, CLI aliases, scaffolder scripts, migrations, generated ignores, templates, docs, and helper reference from drifting. For optional scripted iterations that repeat that gate and commit one small change per pass, see [`scripts/cursor-agent-loop.sh`](../scripts/cursor-agent-loop.sh) (environment variables and usage in the script header; overview in [CONTRIBUTING.md](../CONTRIBUTING.md#optional-scripted-agent-iterations)).
+**PR / maintainer gate:** Before opening a pull request against `Agent-Pattern-Labs/JobForge`, run `npm run verify`, `npm run smoke:iso`, and `npm run build:dashboard` (or `(cd dashboard && go build .)`) from the harness repo root (same as [CONTRIBUTING.md](../CONTRIBUTING.md#development)). `smoke:iso` includes `npm run lint:helpers`, which prevents local helper dependencies, CLI aliases, scaffolder scripts, migrations, generated ignores, templates, docs, and helper reference from drifting. For optional scripted iterations that repeat that gate and commit one small change per pass, see [`scripts/cursor-agent-loop.sh`](../scripts/cursor-agent-loop.sh) (environment variables and usage in the script header; overview in [CONTRIBUTING.md](../CONTRIBUTING.md#optional-scripted-agent-iterations)).
 
 Scripts maintain data consistency. In a consumer project they're invoked via the `job-forge` CLI (`npx job-forge <cmd>`); in the harness repo they're also directly runnable as `node <script>.mjs`.
 
@@ -248,24 +248,24 @@ Scripts maintain data consistency. In a consumer project they're invoked via the
 | `generate-pdf.mjs` | `npx job-forge pdf` | Renders HTML to PDF via Geometra MCP (`geometra_generate_pdf`) or standalone Playwright/Chromium (`npx job-forge pdf <input.html> <output.pdf>`) |
 | `cv-sync-check.mjs` | `npx job-forge sync-check` | Setup lint: `cv.md` + `config/profile.yml`, hardcoded-metric scan on `modes/_shared.md` and `batch/batch-prompt.md`, optional `article-digest.md` freshness |
 | `scripts/token-usage-report.mjs` | `npx job-forge tokens` | Per-session opencode token/cost report from the SQLite DB |
-| `scripts/trace.mjs` | `npx job-forge trace:list` / `trace:stats` / `trace:show` | Local transcript observability via `@razroo/iso-trace`; common commands default to project-local sessions across supported harnesses |
+| `scripts/trace.mjs` | `npx job-forge trace:list` / `trace:stats` / `trace:show` | Local transcript observability via `@agent-pattern-labs/iso-trace`; common commands default to project-local sessions across supported harnesses |
 | `scripts/telemetry.mjs` | `npx job-forge telemetry:status` / `telemetry:show` | JobForge operational telemetry derived from normalized local traces plus tracker TSV state |
-| `scripts/guard.mjs` | `npx job-forge guard:audit` / `guard:explain` | Deterministic `@razroo/iso-guard` policy audits over local normalized traces (with OpenCode `task` rules still available where relevant) |
-| `scripts/ledger.mjs` | `npx job-forge ledger:status` / `ledger:has` / `ledger:rebuild` | Deterministic `@razroo/iso-ledger` state over tracker, TSV, and pipeline files |
-| `scripts/capabilities.mjs` | `npx job-forge capabilities:check` / `capabilities:explain` | Deterministic `@razroo/iso-capabilities` role boundary checks for tools, MCPs, commands, filesystem, and network access |
-| `scripts/cache.mjs` | `npx job-forge cache:has` / `cache:get` / `cache:put` | Deterministic `@razroo/iso-cache` JD and artifact reuse keyed by stable job/url inputs |
-| `scripts/index.mjs` | `npx job-forge index:status` / `index:has` / `index:query` | Deterministic `@razroo/iso-index` lookup over reports, tracker rows, TSVs, pipeline, scan history, and ledger events |
-| `scripts/facts.mjs` | `npx job-forge facts:status` / `facts:has` / `facts:query` | Deterministic `@razroo/iso-facts` materialization over job URLs, scores, application statuses, preflight candidates, scan history, and ledger events |
-| `scripts/timeline.mjs` | `npx job-forge timeline:due` / `timeline:check` / `timeline:build` | Deterministic `@razroo/iso-timeline` follow-up and next-action planning over tracker rows and dated pipeline items |
-| `scripts/prioritize.mjs` | `npx job-forge prioritize:build` / `prioritize:select` / `prioritize:check` | Deterministic `@razroo/iso-prioritize` next-action ranking over materialized facts and due timeline items |
-| `scripts/lineage.mjs` | `npx job-forge lineage:record` / `lineage:check` / `lineage:explain` | Deterministic `@razroo/iso-lineage` stale-output checks for generated reports, PDFs, and their source inputs |
-| `scripts/score.mjs` | `npx job-forge score:check` / `score:gate` / `score:explain` | Deterministic `@razroo/iso-score` checks for weighted offer scores, threshold booleans, recommendations, and score gates |
-| `scripts/canon.mjs` | `npx job-forge canon:normalize` / `canon:key` / `canon:compare` | Deterministic `@razroo/iso-canon` identity normalization for URLs, companies, roles, and company+role pairs |
-| `scripts/context.mjs` | `npx job-forge context:list` / `context:plan` / `context:check` / `context:render` | Deterministic `@razroo/iso-context` mode/reference context bundle planning and rendering |
-| `scripts/preflight.mjs` | `npx job-forge preflight:plan` / `preflight:check` / `preflight:explain` | Deterministic `@razroo/iso-preflight` dispatch planning for file-backed candidate facts and gates |
-| `scripts/postflight.mjs` | `npx job-forge postflight:status` / `postflight:check` / `postflight:explain` | Deterministic `@razroo/iso-postflight` settlement for dispatch outcomes, required tracker TSV artifacts, and merge/verify post-steps |
-| `scripts/redact.mjs` | `npx job-forge redact:scan` / `redact:apply` / `redact:verify` | Deterministic `@razroo/iso-redact` safe-export scanning and sanitization for traces, prompts, reports, and fixtures |
-| `scripts/migrate.mjs` | `npx job-forge migrate:plan` / `migrate:apply` / `migrate:check` | Deterministic `@razroo/iso-migrate` consumer-project upgrades for scripts and generated-artifact ignores |
+| `scripts/guard.mjs` | `npx job-forge guard:audit` / `guard:explain` | Deterministic `@agent-pattern-labs/iso-guard` policy audits over local normalized traces (with OpenCode `task` rules still available where relevant) |
+| `scripts/ledger.mjs` | `npx job-forge ledger:status` / `ledger:has` / `ledger:rebuild` | Deterministic `@agent-pattern-labs/iso-ledger` state over tracker, TSV, and pipeline files |
+| `scripts/capabilities.mjs` | `npx job-forge capabilities:check` / `capabilities:explain` | Deterministic `@agent-pattern-labs/iso-capabilities` role boundary checks for tools, MCPs, commands, filesystem, and network access |
+| `scripts/cache.mjs` | `npx job-forge cache:has` / `cache:get` / `cache:put` | Deterministic `@agent-pattern-labs/iso-cache` JD and artifact reuse keyed by stable job/url inputs |
+| `scripts/index.mjs` | `npx job-forge index:status` / `index:has` / `index:query` | Deterministic `@agent-pattern-labs/iso-index` lookup over reports, tracker rows, TSVs, pipeline, scan history, and ledger events |
+| `scripts/facts.mjs` | `npx job-forge facts:status` / `facts:has` / `facts:query` | Deterministic `@agent-pattern-labs/iso-facts` materialization over job URLs, scores, application statuses, preflight candidates, scan history, and ledger events |
+| `scripts/timeline.mjs` | `npx job-forge timeline:due` / `timeline:check` / `timeline:build` | Deterministic `@agent-pattern-labs/iso-timeline` follow-up and next-action planning over tracker rows and dated pipeline items |
+| `scripts/prioritize.mjs` | `npx job-forge prioritize:build` / `prioritize:select` / `prioritize:check` | Deterministic `@agent-pattern-labs/iso-prioritize` next-action ranking over materialized facts and due timeline items |
+| `scripts/lineage.mjs` | `npx job-forge lineage:record` / `lineage:check` / `lineage:explain` | Deterministic `@agent-pattern-labs/iso-lineage` stale-output checks for generated reports, PDFs, and their source inputs |
+| `scripts/score.mjs` | `npx job-forge score:check` / `score:gate` / `score:explain` | Deterministic `@agent-pattern-labs/iso-score` checks for weighted offer scores, threshold booleans, recommendations, and score gates |
+| `scripts/canon.mjs` | `npx job-forge canon:normalize` / `canon:key` / `canon:compare` | Deterministic `@agent-pattern-labs/iso-canon` identity normalization for URLs, companies, roles, and company+role pairs |
+| `scripts/context.mjs` | `npx job-forge context:list` / `context:plan` / `context:check` / `context:render` | Deterministic `@agent-pattern-labs/iso-context` mode/reference context bundle planning and rendering |
+| `scripts/preflight.mjs` | `npx job-forge preflight:plan` / `preflight:check` / `preflight:explain` | Deterministic `@agent-pattern-labs/iso-preflight` dispatch planning for file-backed candidate facts and gates |
+| `scripts/postflight.mjs` | `npx job-forge postflight:status` / `postflight:check` / `postflight:explain` | Deterministic `@agent-pattern-labs/iso-postflight` settlement for dispatch outcomes, required tracker TSV artifacts, and merge/verify post-steps |
+| `scripts/redact.mjs` | `npx job-forge redact:scan` / `redact:apply` / `redact:verify` | Deterministic `@agent-pattern-labs/iso-redact` safe-export scanning and sanitization for traces, prompts, reports, and fixtures |
+| `scripts/migrate.mjs` | `npx job-forge migrate:plan` / `migrate:apply` / `migrate:check` | Deterministic `@agent-pattern-labs/iso-migrate` consumer-project upgrades for scripts and generated-artifact ignores |
 | `scripts/check-helper-integration.mjs` | `npm run lint:helpers` | Integration lint that keeps helper packages, scripts, scaffolder defaults, migrations, generated ignores, docs, and `modes/reference-local-helpers.md` aligned |
 | `tracker-lib.mjs` | _(library)_ | Shared helpers for reading/writing day-based tracker files — imported by merge/dedup/verify/normalize |
 | `bin/sync.mjs` | `npx job-forge sync` | Creates the harness symlinks in a consumer project and applies safe migrations (also runs as `postinstall`) |

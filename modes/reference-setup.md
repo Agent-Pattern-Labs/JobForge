@@ -118,7 +118,7 @@ Prefer the deterministic helper:
 npx job-forge tracker-line --num 521 --date 2026-04-15 --company "Anthropic" --role "Manager, FDE" --status Evaluated --score 4.2 --pdf no --slug anthropic-manager-fde --notes "Strong fit" --write
 ```
 
-The helper renders and validates the row against `templates/contracts.json` via `@razroo/iso-contract`. To inspect the contract directly:
+The helper renders and validates the row against `templates/contracts.json` via `@agent-pattern-labs/iso-contract`. To inspect the contract directly:
 
 ```bash
 npx iso-contract explain jobforge.tracker-row --contracts templates/contracts.json

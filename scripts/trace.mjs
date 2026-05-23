@@ -200,7 +200,7 @@ function oneLine(value, max) {
 }
 
 function resolveIsoTraceCli() {
-  const pkgJsonPath = require.resolve('@razroo/iso-trace/package.json');
+  const pkgJsonPath = require.resolve('@agent-pattern-labs/iso-trace/package.json');
   return join(dirname(pkgJsonPath), 'dist/cli.js');
 }
 

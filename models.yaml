@@ -1,6 +1,6 @@
 # JobForge model policy.
 #
-# Extends @razroo/iso-route's bundled "standard" preset, then pins every
+# Extends @agent-pattern-labs/iso-route's bundled "standard" preset, then pins every
 # OpenCode route to DeepSeek V4 Flash. Recent traces showed free OpenRouter
 # routes freezing or falling through Venice balance errors, so JobForge's
 # OpenCode default is now "best affordable paid" rather than "free".

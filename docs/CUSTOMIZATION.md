@@ -11,7 +11,7 @@
 > # edit modes/_shared.md — npx job-forge sync will leave it alone from now on
 > ```
 >
-> A cleaner path is to keep customization in `config/profile.yml` where possible (the shared mode files already read from it). Open an issue against `razroo/JobForge` if a piece of personal data is currently stuck in a mode file and ought to be in `profile.yml`.
+> A cleaner path is to keep customization in `config/profile.yml` where possible (the shared mode files already read from it). Open an issue against `Agent-Pattern-Labs/JobForge` if a piece of personal data is currently stuck in a mode file and ought to be in `profile.yml`.
 
 ## Profile (config/profile.yml)
 
@@ -98,7 +98,7 @@ Some forks use a **single** `data/applications.md` instead. That is fine if you 
 
 ## Transcript observability (iso-trace)
 
-To inspect real agent sessions locally (tool mix, redundant fetches, Geometra churn) without uploading transcripts, use the `job-forge trace:*` commands. JobForge depends on Razroo's [`@razroo/iso-trace`](https://github.com/razroo/iso/tree/main/packages/iso-trace), so consumer projects do not need to install it separately.
+To inspect real agent sessions locally (tool mix, redundant fetches, Geometra churn) without uploading transcripts, use the `job-forge trace:*` commands. JobForge depends on Razroo's [`@agent-pattern-labs/iso-trace`](https://github.com/razroo/iso/tree/main/packages/iso-trace), so consumer projects do not need to install it separately.
 
 Common commands default to sessions for the current project and use a 7-day window:
 
@@ -127,7 +127,7 @@ Telemetry is also local-only and passive. It reads normalized local harness trac
 
 ## JobForge ledger
 
-The ledger is append-only local workflow state backed by `@razroo/iso-ledger`. It is not an MCP and does not add prompt, tool-schema, or state-trace tokens. Use it when you want a cheap deterministic check before loading growing tracker files:
+The ledger is append-only local workflow state backed by `@agent-pattern-labs/iso-ledger`. It is not an MCP and does not add prompt, tool-schema, or state-trace tokens. Use it when you want a cheap deterministic check before loading growing tracker files:
 
 ```bash
 npx job-forge ledger:rebuild
@@ -140,63 +140,63 @@ npx job-forge ledger:verify
 
 ## JobForge artifact contracts
 
-Machine-readable artifact shapes live in `templates/contracts.json` and are enforced by `@razroo/iso-contract`. `job-forge tracker-line` renders tracker additions through the `jobforge.tracker-row` contract, `merge` validates pending TSV/table rows before writing tracker files, and `verify` validates existing tracker rows against the same contract. Custom forks can extend `templates/contracts.json`, but keep the tracker status enum aligned with `templates/states.yml`.
+Machine-readable artifact shapes live in `templates/contracts.json` and are enforced by `@agent-pattern-labs/iso-contract`. `job-forge tracker-line` renders tracker additions through the `jobforge.tracker-row` contract, `merge` validates pending TSV/table rows before writing tracker files, and `verify` validates existing tracker rows against the same contract. Custom forks can extend `templates/contracts.json`, but keep the tracker status enum aligned with `templates/states.yml`.
 
 ## JobForge role capabilities
 
-Role capability boundaries live in `templates/capabilities.json` and are enforced locally by `@razroo/iso-capabilities`. Use `job-forge capabilities:explain <role>` to inspect a role and `job-forge capabilities:check <role> ...` to validate a tool, MCP, command, filesystem, or network boundary before changing agent frontmatter. Custom forks can extend the policy, but keep it aligned with `.opencode/agents/` and the routing rules in `iso/instructions.md`.
+Role capability boundaries live in `templates/capabilities.json` and are enforced locally by `@agent-pattern-labs/iso-capabilities`. Use `job-forge capabilities:explain <role>` to inspect a role and `job-forge capabilities:check <role> ...` to validate a tool, MCP, command, filesystem, or network boundary before changing agent frontmatter. Custom forks can extend the policy, but keep it aligned with `.opencode/agents/` and the routing rules in `iso/instructions.md`.
 
 ## JobForge context bundles
 
-Mode/reference context bundles live in `templates/context.json` and are planned locally by `@razroo/iso-context`. Use `job-forge context:plan <mode>` to see the files and estimated tokens, `job-forge context:check <mode>` to fail on budget drift, and `job-forge context:render <mode>` when you intentionally need a compact markdown or JSON context bundle. This is not an MCP and does not add tool-schema tokens; rendered context only consumes prompt tokens when a workflow deliberately asks for it.
+Mode/reference context bundles live in `templates/context.json` and are planned locally by `@agent-pattern-labs/iso-context`. Use `job-forge context:plan <mode>` to see the files and estimated tokens, `job-forge context:check <mode>` to fail on budget drift, and `job-forge context:render <mode>` when you intentionally need a compact markdown or JSON context bundle. This is not an MCP and does not add tool-schema tokens; rendered context only consumes prompt tokens when a workflow deliberately asks for it.
 
 ## JobForge artifact index
 
-Artifact lookup policy lives in `templates/index.json` and is built locally by `@razroo/iso-index`. Use `job-forge index:has --key "company-role:acme:staff-engineer"` as a cheap duplicate/source prefilter, `job-forge index:query "acme"` to get compact source path/line pointers, and `job-forge index:verify` to validate `.jobforge-index.json`. Query, has, and verify rebuild the index on demand, so scaffolded projects need no setup. JobForge canonicalizes company/role and URL records through `templates/canon.json` before writing the index. This is not an MCP and does not add tool-schema tokens.
+Artifact lookup policy lives in `templates/index.json` and is built locally by `@agent-pattern-labs/iso-index`. Use `job-forge index:has --key "company-role:acme:staff-engineer"` as a cheap duplicate/source prefilter, `job-forge index:query "acme"` to get compact source path/line pointers, and `job-forge index:verify` to validate `.jobforge-index.json`. Query, has, and verify rebuild the index on demand, so scaffolded projects need no setup. JobForge canonicalizes company/role and URL records through `templates/canon.json` before writing the index. This is not an MCP and does not add tool-schema tokens.
 
 ## JobForge materialized facts
 
-Fact extraction policy lives in `templates/facts.json` and is built locally by `@razroo/iso-facts`. Use `job-forge facts:query --fact job.url`, `job-forge facts:has --fact application.status --key "company-role:acme:staff-engineer"`, and `job-forge facts:verify` to work with compact source-backed facts instead of rereading reports, tracker day files, TSVs, candidate JSON, scan history, and ledger events. Query, has, verify, and check rebuild `.jobforge-facts.json` on demand, so scaffolded projects need no setup. JobForge canonicalizes company/role and URL fact keys through `templates/canon.json` before writing the fact set. This is not an MCP and does not add prompt or tool-schema tokens.
+Fact extraction policy lives in `templates/facts.json` and is built locally by `@agent-pattern-labs/iso-facts`. Use `job-forge facts:query --fact job.url`, `job-forge facts:has --fact application.status --key "company-role:acme:staff-engineer"`, and `job-forge facts:verify` to work with compact source-backed facts instead of rereading reports, tracker day files, TSVs, candidate JSON, scan history, and ledger events. Query, has, verify, and check rebuild `.jobforge-facts.json` on demand, so scaffolded projects need no setup. JobForge canonicalizes company/role and URL fact keys through `templates/canon.json` before writing the fact set. This is not an MCP and does not add prompt or tool-schema tokens.
 
 ## JobForge timeline policy
 
-Follow-up and next-action policy lives in `templates/timeline.json` and is planned locally by `@razroo/iso-timeline`. Use `job-forge timeline:due` to list due/overdue nudges, `job-forge timeline:check --fail-on overdue` to fail only when action is stale, and `job-forge timeline:build` to materialize `.jobforge-timeline-events.jsonl` plus `.jobforge-timeline.json` for inspection. It reads tracker rows and dated pipeline items from local files, so scaffolded projects need no setup. This is not an MCP and does not add prompt or tool-schema tokens.
+Follow-up and next-action policy lives in `templates/timeline.json` and is planned locally by `@agent-pattern-labs/iso-timeline`. Use `job-forge timeline:due` to list due/overdue nudges, `job-forge timeline:check --fail-on overdue` to fail only when action is stale, and `job-forge timeline:build` to materialize `.jobforge-timeline-events.jsonl` plus `.jobforge-timeline.json` for inspection. It reads tracker rows and dated pipeline items from local files, so scaffolded projects need no setup. This is not an MCP and does not add prompt or tool-schema tokens.
 
 ## JobForge priority queue
 
-Next-action ranking policy lives in `templates/prioritize.json` and is planned locally by `@razroo/iso-prioritize`. Use `job-forge prioritize:build` to materialize `.jobforge-prioritize-items.json` plus `.jobforge-prioritize.json`, `job-forge prioritize:select --limit 3` to inspect the selected queue, and `job-forge prioritize:check` when a workflow must fail if no actionable candidate is selected. It reads source-backed facts and due timeline items, so scaffolded projects need no setup. This is not an MCP and does not add prompt or tool-schema tokens.
+Next-action ranking policy lives in `templates/prioritize.json` and is planned locally by `@agent-pattern-labs/iso-prioritize`. Use `job-forge prioritize:build` to materialize `.jobforge-prioritize-items.json` plus `.jobforge-prioritize.json`, `job-forge prioritize:select --limit 3` to inspect the selected queue, and `job-forge prioritize:check` when a workflow must fail if no actionable candidate is selected. It reads source-backed facts and due timeline items, so scaffolded projects need no setup. This is not an MCP and does not add prompt or tool-schema tokens.
 
 ## JobForge artifact lineage
 
-Artifact lineage lives in `.jobforge-lineage.json` and is checked locally by `@razroo/iso-lineage`. Use `job-forge lineage:record --artifact <report-or-pdf> --input cv.md --input config/profile.yml` after generating an artifact, then `job-forge lineage:check` or `job-forge lineage:check --artifact <file>` to detect stale outputs after source inputs change. This is not an MCP and does not add prompt or tool-schema tokens.
+Artifact lineage lives in `.jobforge-lineage.json` and is checked locally by `@agent-pattern-labs/iso-lineage`. Use `job-forge lineage:record --artifact <report-or-pdf> --input cv.md --input config/profile.yml` after generating an artifact, then `job-forge lineage:check` or `job-forge lineage:check --artifact <file>` to detect stale outputs after source inputs change. This is not an MCP and does not add prompt or tool-schema tokens.
 
 ## JobForge scoring policy
 
-Weighted scoring policy lives in `templates/score.json` and is enforced locally by `@razroo/iso-score`. Use `job-forge score:check --input <score.json>` to validate emitted report score JSON, `job-forge score:gate --input <score.json> --gate apply` to check an application threshold, and `job-forge score:explain` to inspect the active dimensions, weights, bands, and gates. Custom forks can change weights or thresholds in `templates/score.json`, but keep the dimension ids aligned with `modes/_shared.md` and report rendering.
+Weighted scoring policy lives in `templates/score.json` and is enforced locally by `@agent-pattern-labs/iso-score`. Use `job-forge score:check --input <score.json>` to validate emitted report score JSON, `job-forge score:gate --input <score.json> --gate apply` to check an application threshold, and `job-forge score:explain` to inspect the active dimensions, weights, bands, and gates. Custom forks can change weights or thresholds in `templates/score.json`, but keep the dimension ids aligned with `modes/_shared.md` and report rendering.
 
 ## JobForge identity canonicalization
 
-URL, company, role, and company+role identity rules live in `templates/canon.json` and are enforced locally by `@razroo/iso-canon`. Use `job-forge canon:key company-role --company "OpenAI, Inc." --role "Senior SWE, AI Platform"` to derive the same duplicate key used by ledger/index helpers, and `job-forge canon:compare company "OpenAI, Inc." "Open AI"` to explain whether two values resolve to the same entity. Custom forks can extend aliases, suffixes, stop words, and match thresholds in `templates/canon.json`. This is not an MCP and does not add prompt or tool-schema tokens.
+URL, company, role, and company+role identity rules live in `templates/canon.json` and are enforced locally by `@agent-pattern-labs/iso-canon`. Use `job-forge canon:key company-role --company "OpenAI, Inc." --role "Senior SWE, AI Platform"` to derive the same duplicate key used by ledger/index helpers, and `job-forge canon:compare company "OpenAI, Inc." "Open AI"` to explain whether two values resolve to the same entity. Custom forks can extend aliases, suffixes, stop words, and match thresholds in `templates/canon.json`. This is not an MCP and does not add prompt or tool-schema tokens.
 
 ## JobForge preflight plans
 
-Application dispatch policy lives in `templates/preflight.json` and is planned locally by `@razroo/iso-preflight`. After candidate facts and gate results have been materialized into JSON, use `job-forge preflight:plan --candidates <file>` to get bounded rounds and required pre/post steps, or `job-forge preflight:check --candidates <file>` to fail on missing source facts or blocked gates. This is not an MCP and does not add prompt or tool-schema tokens; it consumes only the candidate JSON you deliberately pass to it.
+Application dispatch policy lives in `templates/preflight.json` and is planned locally by `@agent-pattern-labs/iso-preflight`. After candidate facts and gate results have been materialized into JSON, use `job-forge preflight:plan --candidates <file>` to get bounded rounds and required pre/post steps, or `job-forge preflight:check --candidates <file>` to fail on missing source facts or blocked gates. This is not an MCP and does not add prompt or tool-schema tokens; it consumes only the candidate JSON you deliberately pass to it.
 
 ## JobForge postflight settlement
 
-Application settlement policy lives in `templates/postflight.json` and is checked locally by `@razroo/iso-postflight`. After each dispatch round, record observed candidate outcomes and tracker TSV artifact paths in `batch/postflight-outcomes.json`, then run `job-forge postflight:status --plan batch/preflight-plan.json --outcomes batch/postflight-outcomes.json` to get the next safe action. After `merge` and `verify`, add post-step observations and run `job-forge postflight:check ...` to fail unless the workflow is complete. This is not an MCP and does not add prompt or tool-schema tokens.
+Application settlement policy lives in `templates/postflight.json` and is checked locally by `@agent-pattern-labs/iso-postflight`. After each dispatch round, record observed candidate outcomes and tracker TSV artifact paths in `batch/postflight-outcomes.json`, then run `job-forge postflight:status --plan batch/preflight-plan.json --outcomes batch/postflight-outcomes.json` to get the next safe action. After `merge` and `verify`, add post-step observations and run `job-forge postflight:check ...` to fail unless the workflow is complete. This is not an MCP and does not add prompt or tool-schema tokens.
 
 ## JobForge redaction policy
 
-Safe-export redaction rules live in `templates/redact.json` and are enforced locally by `@razroo/iso-redact`. Use `job-forge redact:scan --input <file>` before sharing traces, prompts, reports, or fixtures outside the project, `job-forge redact:apply --input <file> --output .jobforge-redacted/<file>` to write a sanitized copy, and `job-forge redact:verify --input <file>` to fail if secrets or configured PII remain. Findings never print matched values. This is not an MCP and does not add prompt or tool-schema tokens.
+Safe-export redaction rules live in `templates/redact.json` and are enforced locally by `@agent-pattern-labs/iso-redact`. Use `job-forge redact:scan --input <file>` before sharing traces, prompts, reports, or fixtures outside the project, `job-forge redact:apply --input <file> --output .jobforge-redacted/<file>` to write a sanitized copy, and `job-forge redact:verify --input <file>` to fail if secrets or configured PII remain. Findings never print matched values. This is not an MCP and does not add prompt or tool-schema tokens.
 
 ## JobForge consumer migrations
 
-Consumer-project migrations live in `templates/migrations.json` and are applied locally by `@razroo/iso-migrate`. `job-forge sync` applies safe migrations automatically after refreshing symlinks; use `JOB_FORGE_SKIP_MIGRATIONS=1` to opt out. Use `job-forge migrate:plan`, `job-forge migrate:apply`, and `job-forge migrate:check` to inspect or enforce script/gitignore drift explicitly. This is not an MCP and does not add prompt or tool-schema tokens.
+Consumer-project migrations live in `templates/migrations.json` and are applied locally by `@agent-pattern-labs/iso-migrate`. `job-forge sync` applies safe migrations automatically after refreshing symlinks; use `JOB_FORGE_SKIP_MIGRATIONS=1` to opt out. Use `job-forge migrate:plan`, `job-forge migrate:apply`, and `job-forge migrate:check` to inspect or enforce script/gitignore drift explicitly. This is not an MCP and does not add prompt or tool-schema tokens.
 
 ## JobForge guard audits
 
-Guard audits run deterministic `@razroo/iso-guard` policies over the same local traces. The default policy lives at `templates/guards/jobforge-baseline.yaml` and checks rules that are reliable from transcript data, including max two OpenCode `task` dispatches per assistant message, no task-status polling via `task`, no raw proxy configuration in task prompts, and no child session task recursion.
+Guard audits run deterministic `@agent-pattern-labs/iso-guard` policies over the same local traces. The default policy lives at `templates/guards/jobforge-baseline.yaml` and checks rules that are reliable from transcript data, including max two OpenCode `task` dispatches per assistant message, no task-status polling via `task`, no raw proxy configuration in task prompts, and no child session task recursion.
 
 ```bash
 npx job-forge guard:audit
@@ -208,13 +208,13 @@ Use `--policy <path>` to audit with a custom policy. This does not add prompt, t
 
 **Where Claude Code writes JSONL:** `~/.claude/projects/<encoded-cwd>/*.jsonl`.
 
-**Direct CLI fallback:** `npx -y @razroo/iso-trace@latest stats --source "$HOME/.claude/projects/<encoded-dir>/<session>.jsonl"`
+**Direct CLI fallback:** `npx -y @agent-pattern-labs/iso-trace@latest stats --source "$HOME/.claude/projects/<encoded-dir>/<session>.jsonl"`
 
 **Performance:** JobForge narrows discovery to project-local roots where possible, but raw `iso-trace list --cwd /path/to/repo` may still walk large transcript trees on busy machines. Prefer `stats --source <one.jsonl>` or project-scoped roots when you need direct `iso-trace` usage.
 
 ## States (templates/states.yml)
 
-The canonical states rarely need changing. Since `templates/` is a symlink into the harness in consumer projects, adding new states means contributing back to `razroo/JobForge` (see [CONTRIBUTING.md](../CONTRIBUTING.md)). If you're working in the harness repo directly (Path B), update:
+The canonical states rarely need changing. Since `templates/` is a symlink into the harness in consumer projects, adding new states means contributing back to `Agent-Pattern-Labs/JobForge` (see [CONTRIBUTING.md](../CONTRIBUTING.md)). If you're working in the harness repo directly (Path B), update:
 
 1. `templates/states.yml`
 2. `normalize-statuses.mjs` (alias mappings)

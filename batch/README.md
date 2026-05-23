@@ -14,7 +14,7 @@ The `batch/` folder holds the **parallel batch runner** for processing 10+ job U
 
 Per [`.gitignore`](../.gitignore): `batch-input.tsv`, `batch-state.tsv`, `logs/*`, `tracker-additions/*.tsv`, and `.jobforge-runs/`. Empty dirs (`logs/`, `tracker-additions/`) use `.gitkeep` so the tree exists in a fresh clone.
 
-The default runner uses `@razroo/iso-orchestrator` through
+The default runner uses `@agent-pattern-labs/iso-orchestrator` through
 `scripts/batch-orchestrator.mjs`. It persists bundle steps and events in
 `.jobforge-runs/`, caps worker fan-out with `workflow.forEach`, serializes
 state/report-number writes while parallel bundles run, and records worker

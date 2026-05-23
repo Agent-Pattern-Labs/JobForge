@@ -1,4 +1,4 @@
-module github.com/razroo/JobForge/dashboard
+module github.com/Agent-Pattern-Labs/JobForge/dashboard
 
 go 1.24.2
 

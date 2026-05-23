@@ -5,7 +5,7 @@ import {
   formatCacheEntries,
   formatPruneResult,
   formatVerifyResult,
-} from '@razroo/iso-cache';
+} from '@agent-pattern-labs/iso-cache';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   DEFAULT_JD_TTL_MS,

@@ -51,7 +51,7 @@ AI-powered job search pipeline: scans portals, evaluates offers, generates CVs v
 - [D6] Pick the mode from the **Routing** table below AND name it explicitly in your first response (e.g., "running auto-pipeline mode", "this is a `compare` request"). If no row matches the user's intent, ask which mode fits; do not guess.
   why: silent mode picks mis-route work (a "negotiation" question answered in `offer` mode produces the wrong report shape); naming the mode out loud makes the routing decision reviewable and gives downstream dispatches a reliable anchor
 
-- [D7] For standalone `batch` runs, prefer `batch/batch-runner.sh` instead of hand-rolling the loop. It delegates to `@razroo/iso-orchestrator`, persists workflow records in `.jobforge-runs/`, caps bundle fan-out, and mutexes state/report-number writes. Use `JOBFORGE_LEGACY_BATCH_RUNNER=1` only as a fallback.
+- [D7] For standalone `batch` runs, prefer `batch/batch-runner.sh` instead of hand-rolling the loop. It delegates to `@agent-pattern-labs/iso-orchestrator`, persists workflow records in `.jobforge-runs/`, caps bundle fan-out, and mutexes state/report-number writes. Use `JOBFORGE_LEGACY_BATCH_RUNNER=1` only as a fallback.
   why: the old Bash loop encoded resumability and parallelism manually; the iso-orchestrator path makes the durable control state inspectable and prevents report-number collisions under parallel bundles
 
 - [D8] Use deterministic local helpers instead of prose when they can answer or validate state, identity, policy, scoring, timing, dispatch, priority, lineage, migration, or safe-export questions. Read `modes/reference-local-helpers.md` when choosing a helper or changing helper wiring.

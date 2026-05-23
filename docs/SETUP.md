@@ -59,7 +59,7 @@ Or simpler, via the scaffolded script: `npm run update-harness` (also refreshes 
 Use this if you want to hack on the harness itself (edit `iso/`, tune the scoring model, add modes, contribute back). Personal files are gitignored.
 
 ```bash
-git clone https://github.com/razroo/JobForge.git
+git clone https://github.com/Agent-Pattern-Labs/JobForge.git
 cd JobForge
 npm install
 npm run build:config   # regenerate per-harness trees from iso/ (CLAUDE.md,
@@ -236,4 +236,4 @@ Paths are relative to the project root: create the markdown file under `jds/` an
 
 ## Contributing
 
-Pull requests and issue reports are welcome on `razroo/JobForge`. See [CONTRIBUTING.md](../CONTRIBUTING.md) for branch workflow, ideas (documentation, `examples/`, `templates/portals.example.yml`, dashboard features, utility scripts), and the checks maintainers expect before a PR (`npm run verify` and `npm run build:dashboard`). Contributors work against Path B (clone the harness directly).
+Pull requests and issue reports are welcome on `Agent-Pattern-Labs/JobForge`. See [CONTRIBUTING.md](../CONTRIBUTING.md) for branch workflow, ideas (documentation, `examples/`, `templates/portals.example.yml`, dashboard features, utility scripts), and the checks maintainers expect before a PR (`npm run verify` and `npm run build:dashboard`). Contributors work against Path B (clone the harness directly).

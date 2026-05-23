@@ -3222,7 +3222,7 @@ cross_company_feeds:
     type: remoteok
     url: https://remoteok.com/api
     # Required — RemoteOK returns 403 without a browser-like UA.
-    user_agent: "Mozilla/5.0 (compatible; JobForgeScanner/1.0; +https://github.com/razroo/JobForge)"
+    user_agent: "Mozilla/5.0 (compatible; JobForgeScanner/1.0; +https://github.com/Agent-Pattern-Labs/JobForge)"
     # Pre-filter on entry.tags (case-insensitive substring match against the
     # array). Row passes if ANY positive matches AND NO negative matches.
     tag_filter:

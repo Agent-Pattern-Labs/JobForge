@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Durable JobForge batch runner powered by @razroo/iso-orchestrator.
+ * Durable JobForge batch runner powered by @agent-pattern-labs/iso-orchestrator.
  *
  * This preserves the public batch-runner.sh interface while moving the
  * load-bearing control loop into a resumable workflow:
@@ -25,7 +25,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { runWorkflow } from '@razroo/iso-orchestrator';
+import { runWorkflow } from '@agent-pattern-labs/iso-orchestrator';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(__dirname, '..');

@@ -286,7 +286,7 @@ write('opencode.json', JSON.stringify(opencodeCfg, null, 2) + '\n');
 
 write('AGENTS.md', `# AGENTS — ${name}
 
-Personal job search project using the [job-forge](https://github.com/razroo/JobForge) harness. The harness lives in \`node_modules/job-forge/\`; most files you need are accessible through symlinks at the project root.
+Personal job search project using the [job-forge](https://github.com/Agent-Pattern-Labs/JobForge) harness. The harness lives in \`node_modules/job-forge/\`; most files you need are accessible through symlinks at the project root.
 
 **How context loads in this project:** opencode auto-loads *this* file as the project-root AGENTS.md, then loads \`AGENTS.harness.md\` plus \`.opencode/instructions.md\` via \`opencode.json:instructions\`. \`AGENTS.harness.md\` is the shared cross-harness contract; \`.opencode/instructions.md\` is reserved for OpenCode-only addenda. Keep *this* file for personal overrides — anything you want to diverge from or add on top.
 
@@ -442,7 +442,7 @@ node_modules/
 
 write('README.md', `# ${name}
 
-Personal job search project using the [job-forge](https://github.com/razroo/JobForge) harness.
+Personal job search project using the [job-forge](https://github.com/Agent-Pattern-Labs/JobForge) harness.
 
 ## Setup
 
@@ -459,7 +459,7 @@ Then fill in:
 ## Updating the harness
 
 \`\`\`bash
-npm update job-forge       # pulls the latest from razroo/JobForge
+npm update job-forge       # pulls the latest from Agent-Pattern-Labs/JobForge
 job-forge sync             # re-run if symlinks drift
 \`\`\`
 

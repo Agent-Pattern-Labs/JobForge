@@ -6,13 +6,13 @@ Contributor workflows operate against a direct clone of the harness repo (Path B
 
 ## Quick Start
 
-1. Fork `razroo/JobForge`
+1. Fork `Agent-Pattern-Labs/JobForge`
 2. Clone your fork and run `npm install` inside it (the `postinstall` symlink step is a no-op inside the harness repo)
 3. Create a branch (`git checkout -b feature/my-feature`)
 4. Make your changes
 5. Verify with `npm run verify`, `npm run smoke:iso`, and `npm run build:dashboard` (see [Development](#development) below)
 6. Commit and push
-7. Open a Pull Request against `razroo/JobForge`
+7. Open a Pull Request against `Agent-Pattern-Labs/JobForge`
 
 ## What to Contribute
 
@@ -20,7 +20,7 @@ Contributor workflows operate against a direct clone of the harness repo (Path B
 - Add companies to `templates/portals.example.yml`
 - Improve documentation (start from the [documentation index](docs/README.md) so new pages land in the right place)
 - Add example CVs for different roles (in `examples/` — see `examples/README.md`)
-- Report bugs via [Issues](https://github.com/razroo/JobForge/issues)
+- Report bugs via [Issues](https://github.com/Agent-Pattern-Labs/JobForge/issues)
 
 **Bigger contributions:**
 - New evaluation dimensions or scoring logic
@@ -92,4 +92,4 @@ Paths such as `modes/`, `batch/`, `dashboard/`, `docs/`, and `scripts/` are incl
 - [Setup guide](docs/SETUP.md) — install, profile, CV, portals, verify
 - [Architecture](docs/ARCHITECTURE.md) — how evaluation, batch, and scripts fit together
 - [Customization](docs/CUSTOMIZATION.md) — profile, archetypes, portals, template, states
-- [Open an issue](https://github.com/razroo/JobForge/issues)
+- [Open an issue](https://github.com/Agent-Pattern-Labs/JobForge/issues)

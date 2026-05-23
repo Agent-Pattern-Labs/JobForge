@@ -2,7 +2,7 @@
 
 import { dirname, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { audit, formatAuditResult, formatPolicyExplanation, loadPolicy, resultFails } from '@razroo/iso-guard';
+import { audit, formatAuditResult, formatPolicyExplanation, loadPolicy, resultFails } from '@agent-pattern-labs/iso-guard';
 import {
   buildSessionGraph,
   collectDispatchCalls,

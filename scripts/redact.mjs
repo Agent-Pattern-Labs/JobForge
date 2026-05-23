@@ -9,7 +9,7 @@ import {
   parseJson,
   redactText,
   scanSources,
-} from '@razroo/iso-redact';
+} from '@agent-pattern-labs/iso-redact';
 import { PROJECT_DIR } from '../tracker-lib.mjs';
 import {
   jobForgeRedactConfigPath,
