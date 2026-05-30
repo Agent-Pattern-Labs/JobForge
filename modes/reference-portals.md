@@ -139,6 +139,6 @@ The Geometra MCP partitions its reusable-proxy pool by proxy identity and browse
 }
 ```
 
-`job-forge mcp:geometra` resolves Geometra in this order: `JOB_FORGE_GEOMETRA_MCP_PATH` if set, then a sibling local `../geometra/mcp/dist/index.js` checkout for maintainers working across both repos, then the pinned npm fallback.
+`job-forge mcp:geometra` resolves Geometra in this order: `JOB_FORGE_GEOMETRA_MCP_PATH`, then `package.json -> jobForge.geometraMcpPath`, then `opencode.json -> mcp.geometra.environment.JOB_FORGE_GEOMETRA_MCP_PATH`, then a sibling local `../geometra/mcp/dist/index.js` checkout for maintainers working across both repos, then the pinned npm fallback.
 
 To check or modify MCP settings, edit `opencode.json` in the project root.

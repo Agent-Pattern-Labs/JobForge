@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DEFAULT_FALLBACK_PACKAGE = '@geometra/mcp@1.61.3';
@@ -22,12 +22,64 @@ function resolveExplicitPath(rawPath) {
   return resolvedPath;
 }
 
+function readJsonFile(filePath) {
+  return JSON.parse(readFileSync(filePath, 'utf8'));
+}
+
+function readProjectPathFromPackageJson(projectDir) {
+  const packagePath = join(projectDir, 'package.json');
+  if (!existsSync(packagePath)) return null;
+  const pkg = readJsonFile(packagePath);
+  const rawPath = pkg?.jobForge?.geometraMcpPath;
+  return normalizeEnv(rawPath);
+}
+
+function readProjectPathFromOpencodeConfig(projectDir) {
+  const configPath = join(projectDir, 'opencode.json');
+  if (!existsSync(configPath)) return null;
+  const config = readJsonFile(configPath);
+  const rawPath = config?.mcp?.geometra?.environment?.JOB_FORGE_GEOMETRA_MCP_PATH;
+  return normalizeEnv(rawPath);
+}
+
+function resolveProjectConfiguredPath(projectDir) {
+  const packagePath = readProjectPathFromPackageJson(projectDir);
+  if (packagePath) {
+    return {
+      source: 'project-package-json',
+      resolvedPath: resolve(projectDir, packagePath),
+    };
+  }
+
+  const opencodePath = readProjectPathFromOpencodeConfig(projectDir);
+  if (opencodePath) {
+    return {
+      source: 'project-opencode-json',
+      resolvedPath: resolve(projectDir, opencodePath),
+    };
+  }
+
+  return null;
+}
+
 export function resolveGeometraMcpLaunchTarget() {
   const explicitPath = normalizeEnv(process.env.JOB_FORGE_GEOMETRA_MCP_PATH);
   if (explicitPath) {
     const resolvedPath = resolveExplicitPath(explicitPath);
     return {
       source: 'env-path',
+      command: process.execPath,
+      args: [resolvedPath],
+      resolvedPath,
+    };
+  }
+
+  const projectDir = process.env.JOB_FORGE_PROJECT || process.cwd();
+  const projectConfigured = resolveProjectConfiguredPath(projectDir);
+  if (projectConfigured) {
+    const resolvedPath = resolveExplicitPath(projectConfigured.resolvedPath);
+    return {
+      source: projectConfigured.source,
       command: process.execPath,
       args: [resolvedPath],
       resolvedPath,
