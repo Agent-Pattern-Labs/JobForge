@@ -16,6 +16,7 @@
  *   normalize      Run normalize-statuses.mjs
  *   pdf            Run generate-pdf.mjs
  *   sync-check     Run cv-sync-check.mjs
+ *   mcp:geometra   Launch Geometra MCP via JobForge's local/npm resolver
  *   tokens         Run scripts/token-usage-report.mjs
  *   trace:*        Inspect local agent transcripts via iso-trace
  *   telemetry:*    Summarize JobForge pipeline status from traces + tracker files
@@ -55,6 +56,7 @@ const commands = {
   normalize:    'normalize-statuses.mjs',
   pdf:          'generate-pdf.mjs',
   'sync-check': 'cv-sync-check.mjs',
+  'mcp:geometra': 'bin/geometra-mcp-launcher.mjs',
   tokens:       'scripts/token-usage-report.mjs',
   sync:         'bin/sync.mjs',
   // Deterministic helpers — agents call these instead of deriving values
@@ -244,6 +246,7 @@ Commands:
   normalize      Normalize status values across the tracker
   pdf            Generate ATS-optimized CV PDF from cv.md
   sync-check     Lint: verify cv.md and profile.yml are filled in
+  mcp:geometra   Launch Geometra MCP, preferring local JobForge/Geometra dev wiring
   tokens         Show opencode token usage and cost by session/day
   trace          Pass through to iso-trace (e.g. job-forge trace sources)
   trace:list     List recent local agent sessions (defaults: --since 7d --cwd project)

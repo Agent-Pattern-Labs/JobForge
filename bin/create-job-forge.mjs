@@ -240,7 +240,11 @@ const opencodeCfg = {
   mcp: {
     geometra: {
       type: 'local',
-      command: ['npx', '-y', '@geometra/mcp@1.61.3'],
+      command: ['npx', '--no-install', 'job-forge', 'mcp:geometra'],
+      environment: {
+        GEOMETRA_STEALTH: '1',
+        GEOMETRA_BROWSER: 'stealth',
+      },
       enabled: true,
     },
     gmail: {

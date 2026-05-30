@@ -2,7 +2,11 @@
   "servers": {
     "geometra": {
       "command": "npx",
-      "args": ["-y", "@geometra/mcp@1.61.3"]
+      "args": ["--no-install", "job-forge", "mcp:geometra"],
+      "env": {
+        "GEOMETRA_STEALTH": "1",
+        "GEOMETRA_BROWSER": "stealth"
+      }
     },
     "gmail": {
       "command": "npx",
