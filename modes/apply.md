@@ -42,8 +42,8 @@ Live application assistant. Reads the active application form in Chrome (via Geo
 - [D6] Use `fieldLabel` over `fieldId` everywhere it works.
   why: labels are stable across DOM refreshes; IDs are regenerated
 
-- [D7] If the orchestrator says a proxy is configured, read the top-level `proxy:` block from `config/profile.yml` and pass that object plus `stealth: true` into every `geometra_connect` call — including Call 3 of the recovery sequence. If the task prompt includes a legacy inline `proxy` object, pass it through and still set `stealth: true`, but do not echo credentials in status text. If absent, run with `stealth: true` and no proxy; never invent a proxy URL.
-  why: class-B Ashby / Cloudflare-fronted portals need a residential outbound IP plus a stealth Chromium fingerprint. Geometra MCP v1.59.0 added proxy plumbing, and v1.61.3 added CloakBrowser stealth Chromium via `stealth: true`; the orchestrator owns the config pipe. See "BYO Residential Proxy" in modes/reference-portals.md.
+- [D7] If the orchestrator says a proxy is configured, read the top-level `proxy:` block from `config/profile.yml` and pass that object plus `headless: true` and `stealth: true` into every `geometra_connect` call — including Call 3 of the recovery sequence — and every Geometra auto-connect call that passes `pageUrl` or `url`. If the task prompt includes a legacy inline `proxy` object, pass it through and still set `headless: true` and `stealth: true`, but do not echo credentials in status text. If absent, run with `headless: true`, `stealth: true`, and no proxy; never invent a proxy URL.
+  why: class-B Ashby / Cloudflare-fronted portals need a residential outbound IP plus a stealth Chromium fingerprint, and Geometra opens visible Chromium unless `headless: true` is explicit. Geometra MCP v1.59.0 added proxy plumbing, and v1.61.3 added CloakBrowser stealth Chromium via `stealth: true`; the orchestrator owns the config pipe. See "BYO Residential Proxy" in modes/reference-portals.md.
 
 - [D8] Upgrade application routing to `@general-paid` when the offer score is ≥ 4.0/5, the user flags "top-tier", "dream job", or "high-stakes", or the candidate is late-stage/post-screen.
   why: high-stakes applications need the quality-sensitive prompt and medium reasoning budget even though OpenCode now routes both application tiers through DeepSeek V4 Flash by default
@@ -53,23 +53,24 @@ Live application assistant. Reads the active application form in Chrome (via Geo
 
 ## Procedure
 
-1. `geometra_connect` with `stealth: true` + `geometra_page_model`; thread `proxy` if present [D7]; no WebFetch [D5].
-2. If Geometra is unavailable, ask for screenshot or pasted text [D2].
-3. Extract company + role; Grep `reports/` for a matching evaluation.
-4. Load full report + Section G if present.
-5. Compare role on screen vs evaluated role [D3].
-6. If different, pause for the candidate's decision [D3].
-7. Before dispatch, run Geometra cleanup [H4] and location filter [D1].
-8. Route high-stakes applications through `@general-paid` [D8].
-9. Extract form questions; classify each Section-G vs new.
-10. Generate answers from Block B + Block F + Section G + JD.
-11. Submit as ONE `run_actions` call [H1] using labels [D6] with `imeFriendly: true` [D4].
-12. On session error, run the 4-step recovery; only one retry [H2].
-13. On provider failure, stop and inspect telemetry before any retry [D9].
-14. On OTP prompt, fetch the code from Gmail via `gmail_get_message`.
-15. Submit the OTP with `geometra_fill_otp` and click Submit.
-16. Write outcome as `batch/tracker-additions/*.tsv` [H3].
-17. Cap parallelism at 2 per round [H5]; one in-flight per company.
+1. `geometra_connect`: `headless: true`, `stealth: true`, `isolated: true` [D7].
+2. Run `geometra_page_model`; do not WebFetch the URL [D5].
+3. If Geometra is unavailable, ask for screenshot or pasted text [D2].
+4. Extract company + role; Grep `reports/` for a matching evaluation.
+5. Load full report + Section G if present.
+6. Compare role on screen vs evaluated role [D3].
+7. If different, pause for the candidate's decision [D3].
+8. Before dispatch, run Geometra cleanup [H4] and location filter [D1].
+9. Route high-stakes applications through `@general-paid` [D8].
+10. Extract form questions; classify each Section-G vs new.
+11. Generate answers from Block B + Block F + Section G + JD.
+12. Submit as ONE `run_actions` call [H1] using labels [D6] with `imeFriendly: true` [D4].
+13. On session error, run the 4-step recovery; only one retry [H2].
+14. On provider failure, stop and inspect telemetry before any retry [D9].
+15. On OTP prompt, fetch the code from Gmail via `gmail_get_message`.
+16. Submit the OTP with `geometra_fill_otp` and click Submit.
+17. Write outcome as `batch/tracker-additions/*.tsv` [H3].
+18. Cap parallelism at 2 per round [H5]; one in-flight per company.
 
 ## Routing
 
@@ -211,7 +212,7 @@ If a subagent fails, report it in the summary and let the user decide whether to
 
 ## Verify these requirements
 
-- **Best with Geometra MCP**: In visible proxy mode, the candidate sees the browser and opencode can interact with the page via `geometra_connect`, `geometra_form_schema`, and `geometra_fill_form`.
+- **Best with Geometra MCP**: In headless proxy mode, opencode can interact with the page via `geometra_connect`, `geometra_form_schema`, and `geometra_fill_form` without opening a visible browser window.
 - **Without Geometra**: the candidate shares a screenshot or pastes the questions manually.
 
 ## Run this workflow

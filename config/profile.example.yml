@@ -92,17 +92,18 @@ location_constraints:
 # mobile / SOCKS proxy you already pay for. Bypasses the datacenter-IP
 # fingerprinting that drives ~80-90% of Ashby / Lever / Cloudflare-fronted
 # "flagged as possible spam" submit failures in headless mode. JobForge passes
-# `stealth: true` by default so Geometra MCP >= 1.61.3 launches CloakBrowser's
-# patched Chromium for portal sessions.
+# `headless: true` and `stealth: true` by default so Geometra MCP >= 1.61.3
+# launches CloakBrowser's patched Chromium for portal sessions without opening
+# visible browser windows.
 #
 # BYO — JobForge does NOT bundle or resell proxy bandwidth. Pick a residential
 # or mobile provider (Bright Data, Oxylabs, SOAX, Smartproxy, etc.), or a
 # mobile hotspot, or your own SOCKS relay. Required: Geometra MCP >= 1.61.3.
 #
 # When present, the apply / scan / auto-pipeline modes thread this into every
-# `geometra_connect` call as `proxy: {...}` alongside `stealth: true`. Pool is
-# partitioned by proxy identity and stealth mode so direct and proxied sessions
-# never share a Chromium.
+# `geometra_connect` call as `proxy: {...}` alongside `headless: true` and
+# `stealth: true`. Pool is partitioned by proxy identity and stealth mode so
+# direct and proxied sessions never share a Chromium.
 #
 # proxy:
 #   server: "http://residential.example.com:8080"   # http://, https://, or socks5://

@@ -53,9 +53,9 @@ When a form says "enter the code we sent to your email", you MUST retrieve the c
 
 **Problem:** on 2026-04-19 cycle 4, 5/5 untested Ashby tenants and 100% of Dropbox-class Cloudflare-fronted portals fingerprint-blocked headless Chromium from datacenter IPs. `imeFriendly: true` fixes class A (React validation lag) but has zero effect on class B (environment fingerprint). There is no in-session software-only fix for class B: the server decided the session is a bot before the form response was rendered.
 
-**Fix:** route the spawned Chromium through a residential or mobile proxy the candidate already pays for, and launch Geometra's CloakBrowser stealth Chromium with `stealth: true`. Geometra MCP v1.59.0 added a `proxy: { server, username?, password?, bypass? }` parameter on `geometra_connect` and `geometra_prepare_browser`; v1.61.3 added `stealth: true` for CloakBrowser. The outbound IP becomes residential/mobile, the browser fingerprint moves off stock Playwright Chromium, and the class-B checks have fewer signals to trip.
+**Fix:** route the spawned Chromium through a residential or mobile proxy the candidate already pays for, and launch Geometra's headless CloakBrowser stealth Chromium with `headless: true` and `stealth: true`. Geometra MCP v1.59.0 added a `proxy: { server, username?, password?, bypass? }` parameter on `geometra_connect` and `geometra_prepare_browser`; v1.61.3 added `stealth: true` for CloakBrowser. The outbound IP becomes residential/mobile, the browser fingerprint moves off stock Playwright Chromium, and the class-B checks have fewer signals to trip.
 
-**Proxy is opt-in, stealth is default.** JobForge does NOT bundle or resell proxy bandwidth — the candidate brings their own provider (Bright Data, Oxylabs, SOAX, Smartproxy, mobile hotspot, self-hosted SOCKS). Without a configured proxy, JobForge still passes `stealth: true`, but the outbound IP remains the machine or hosting environment running Chromium.
+**Proxy is opt-in; headless and stealth are default.** JobForge does NOT bundle or resell proxy bandwidth — the candidate brings their own provider (Bright Data, Oxylabs, SOAX, Smartproxy, mobile hotspot, self-hosted SOCKS). Without a configured proxy, JobForge still passes `headless: true` and `stealth: true`, but the outbound IP remains the machine or hosting environment running Chromium.
 
 ### Where the proxy config lives
 
@@ -76,15 +76,15 @@ See `config/profile.example.yml` for the commented-out template.
 **Orchestrator responsibilities:**
 
 1. On session start, read `config/profile.yml` once. If a `proxy:` block is present, remember that a proxy is configured, but do not paste username/password values into task prompts or user-visible status.
-2. When dispatching any subagent whose work involves a `geometra_connect` call, tell it to read `config/profile.yml` and pass the top-level `proxy:` block plus `stealth: true` to every `geometra_connect` call. Example dispatch prompt line: "Proxy is configured; read `config/profile.yml` and pass its top-level `proxy:` object plus `stealth: true` to every `geometra_connect` call."
-3. When the orchestrator itself opens a Chromium session (single-application interactive flow), include the same `proxy` object from `config/profile.yml` and `stealth: true` in its own `geometra_connect` call.
+2. When dispatching any subagent whose work involves a `geometra_connect` call or a Geometra auto-connect call with `pageUrl` / `url`, tell it to read `config/profile.yml` and pass the top-level `proxy:` block plus `headless: true` and `stealth: true` to every connect. Example dispatch prompt line: "Proxy is configured; read `config/profile.yml` and pass its top-level `proxy:` object plus `headless: true` and `stealth: true` to every Geometra connect or auto-connect call."
+3. When the orchestrator itself opens a Chromium session (single-application interactive flow), include the same `proxy` object from `config/profile.yml`, `headless: true`, and `stealth: true` in its own `geometra_connect` call.
 4. If `proxy:` is absent from `profile.yml`, skip the param entirely. Do NOT invent a proxy URL or leave a stale placeholder.
 
 **Subagent responsibilities:**
 
-1. If the task prompt says proxy is configured, read `config/profile.yml` and pass the top-level `proxy:` object plus `stealth: true` through to `geometra_connect` and any `geometra_prepare_browser` calls unchanged.
-2. If the task prompt includes a legacy inline `proxy` object, pass it through unchanged and still set `stealth: true`, but never print the credentials back in status text.
-3. If the task prompt does NOT mention a proxy and `config/profile.yml` has no `proxy:` block, run with `stealth: true` and no proxy.
+1. If the task prompt says proxy is configured, read `config/profile.yml` and pass the top-level `proxy:` object plus `headless: true` and `stealth: true` through to `geometra_connect`, any Geometra auto-connect call with `pageUrl` / `url`, and any `geometra_prepare_browser` calls unchanged.
+2. If the task prompt includes a legacy inline `proxy` object, pass it through unchanged and still set `headless: true` and `stealth: true`, but never print the credentials back in status text.
+3. If the task prompt does NOT mention a proxy and `config/profile.yml` has no `proxy:` block, run with `headless: true`, `stealth: true`, and no proxy.
 4. Never second-guess the proxy field — if it comes from `profile.yml`, it's authoritative.
 
 ### When proxy use is load-bearing
