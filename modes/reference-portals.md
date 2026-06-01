@@ -100,6 +100,10 @@ Apply these rules when deciding whether the proxy is worth waiting for:
 
 The Geometra MCP partitions its reusable-proxy pool by proxy identity and browser flavor — proxy partitioning landed in `@geometra/mcp@1.59.0`, and stealth partitioning is available in `@geometra/mcp@1.61.3`. A direct session and a proxied session NEVER share a Chromium instance, and stock and stealth sessions do not pool together. Practical consequence: flipping `proxy:` on or off in `profile.yml` mid-session is safe — the next `geometra_connect` just opens a fresh Chromium in its own pool partition.
 
+### Direct helper for one-shot reads
+
+Use `npx job-forge portal:snapshot --url "{url}" --json` or `npx job-forge portal:form-schema --url "{url}" --json` when you only need a rendered page model, compact snapshot, or form schema. These commands import Geometra's session module directly instead of going through MCP, enforce `headless: true`, `stealth: true`, and `isolated: true`, pass the `config/profile.yml` proxy block if configured, and close Chromium before exit. Keep MCP for interactive multi-step browser automation where a live `sessionId` must be driven across actions.
+
 ### Troubleshooting
 
 | Symptom | Diagnosis |

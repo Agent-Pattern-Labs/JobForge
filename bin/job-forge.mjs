@@ -17,6 +17,7 @@
  *   pdf            Run generate-pdf.mjs
  *   sync-check     Run cv-sync-check.mjs
  *   mcp:geometra   Launch Geometra MCP via JobForge's local/npm resolver
+ *   portal:*       One-shot direct-Geometra browser snapshots/form schemas
  *   tokens         Run scripts/token-usage-report.mjs
  *   trace:*        Inspect local agent transcripts via iso-trace
  *   telemetry:*    Summarize JobForge pipeline status from traces + tracker files
@@ -89,6 +90,12 @@ const telemetryAliases = {
 const guardAliases = {
   'guard:audit': 'audit',
   'guard:explain': 'explain',
+};
+
+const portalAliases = {
+  'portal:snapshot': 'snapshot',
+  'portal:form-schema': 'form-schema',
+  'portal:explain': 'explain',
 };
 
 const ledgerAliases = {
@@ -247,6 +254,9 @@ Commands:
   pdf            Generate ATS-optimized CV PDF from cv.md
   sync-check     Lint: verify cv.md and profile.yml are filled in
   mcp:geometra   Launch Geometra MCP, preferring local JobForge/Geometra dev wiring
+  portal:snapshot      Render a URL with direct Geometra and print page model/snapshot
+  portal:form-schema   Render a URL with direct Geometra and print form schema
+  portal:explain       Show direct Geometra module/defaults
   tokens         Show opencode token usage and cost by session/day
   trace          Pass through to iso-trace (e.g. job-forge trace sources)
   trace:list     List recent local agent sessions (defaults: --since 7d --cwd project)
@@ -354,6 +364,8 @@ Pass --help after a command to see its own flags, e.g.:
   job-forge telemetry:show ses_...
   job-forge guard:audit
   job-forge guard:explain
+  job-forge portal:snapshot --url https://example.test/jobs/123 --json
+  job-forge portal:form-schema --url https://example.test/apply --json
   job-forge ledger:has --company "Acme" --role "Staff Engineer" --status Applied
   job-forge capabilities:explain general-free
   job-forge capabilities:check general-free --tool browser --mcp geometra --command "npx job-forge merge" --filesystem write
@@ -430,6 +442,21 @@ if (cmd === 'guard' || guardAliases[cmd]) {
 
   const scriptPath = join(PKG_ROOT, 'scripts/guard.mjs');
   const result = spawnSync(process.execPath, [scriptPath, ...guardArgs], {
+    stdio: 'inherit',
+    cwd: PROJECT_DIR,
+    env: process.env,
+  });
+
+  process.exit(result.status ?? 1);
+}
+
+if (cmd === 'portal' || portalAliases[cmd]) {
+  const portalArgs = cmd === 'portal'
+    ? (rest.length === 0 ? ['help'] : rest)
+    : [portalAliases[cmd], ...rest];
+
+  const scriptPath = join(PKG_ROOT, 'scripts/portal.mjs');
+  const result = spawnSync(process.execPath, [scriptPath, ...portalArgs], {
     stdio: 'inherit',
     cwd: PROJECT_DIR,
     env: process.env,

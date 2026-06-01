@@ -7,7 +7,7 @@ Processes accumulated job offer URLs from `data/pipeline.md`. The user adds URLs
 1. **Read** `data/pipeline.md` → find `- [ ]` items in the "Pending" section
 2. **For each pending URL**:
    a. Calculate the next sequential `REPORT_NUM` by running `npx job-forge next-num` (scans `reports/`, day file `#` columns, and `batch/tracker-additions/` — do NOT derive from `reports/` alone)
-   b. **Extract JD** using Geometra MCP (`geometra_connect({ ..., headless: true, stealth: true })` + geometra_page_model) → WebFetch → WebSearch
+   b. **Extract JD** using Greenhouse API → `npx job-forge portal:snapshot --url "$URL" --json` → Geometra MCP only if an interactive session is needed → WebFetch → WebSearch
    c. If the URL is not accessible → mark as `- [!]` with a note and continue
    d. **Run full auto-pipeline**: A-F Evaluation → Report .md → PDF (if score >= 3.0, per `_shared.md` thresholds) → Draft answers (if score >= 3.5) → Tracker
    e. **Move from "Pending" to "Processed"**: `- [x] #NNN | URL | Company | Role | Score/5 | PDF ✅/❌`
@@ -34,9 +34,10 @@ Processes accumulated job offer URLs from `data/pipeline.md`. The user adds URLs
 ## Detect JD From URL
 
 1. **Greenhouse JSON API (FIRST, when the entry has `| gh={slug}/{id}` OR the host looks Greenhouse-backed):** WebFetch `https://boards-api.greenhouse.io/v1/boards/{slug}/jobs/{id}`. 200 + JSON with `content` = LIVE, use it as the JD; 404 = genuinely CLOSED (mark `- [!]` and continue). **OpenCode WebFetch compatibility:** do not pass `format: "json"`; omit `format` or use `format: "text"` and parse the returned JSON text. Bot-hostile customer fronts (`pinterestcareers.com`, `okta.com`, `samsara.com`, `zoominfo.com`, `collibra.com`, `careers.toasttab.com`, `careers.airbnb.com`, `coinbase.com`, `instacart.careers`, `careers.toasttab.com`) MUST be verified via this API first — WebFetch/Geometra of those domains returns a shell or 403 and causes false CLOSED marks.
-2. **Geometra MCP:** `geometra_connect({ ..., headless: true, stealth: true })` + `geometra_page_model`. Works with non-Greenhouse SPAs (Lever, Ashby, Workday), uses fewer tokens than raw DOM snapshots.
-3. **WebFetch (fallback):** For static pages or when Geometra is not available.
-4. **WebSearch (last resort):** Search on secondary portals that index the JD.
+2. **Direct Geometra helper:** `npx job-forge portal:snapshot --url "{url}" --json`. Works with non-Greenhouse SPAs (Lever, Ashby, Workday), enforces `headless: true`, `stealth: true`, and `isolated: true` in code, reads `config/profile.yml` proxy config, and closes Chromium before exit.
+3. **Geometra MCP (interactive fallback):** Use only when the one-shot helper is not enough and a live multi-step browser session is required.
+4. **WebFetch (fallback):** For static pages or when Geometra is not available.
+5. **WebSearch (last resort):** Search on secondary portals that index the JD.
 
 **Special cases:**
 - **LinkedIn**: May require login → mark `[!]` and ask the user to paste the text
@@ -68,6 +69,7 @@ Step 1  — Read data/pipeline.md; collect "- [ ]" URLs into `pending = [url_1, 
 Step 2  — Pre-flight cleanup (once, before loop):
             geometra_list_sessions()
             geometra_disconnect({ closeBrowser: true })
+            # portal:* helpers are direct-package one-shots and auto-close.
 Step 3  — For round in ceil(N/2):
             pair = pending[round*2 : round*2 + 2]
             # ONE message, 1 or 2 task() calls. Never 3.

@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DEFAULT_FALLBACK_PACKAGE = '@geometra/mcp@1.61.3';
+const DEFAULT_FALLBACK_PACKAGE = '@geometra/mcp@1.62.1';
 const RESOLVE_ONLY_FLAG = '--job-forge-resolve-target';
 
 function normalizeEnv(value) {

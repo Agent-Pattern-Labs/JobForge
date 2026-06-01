@@ -9,7 +9,7 @@ Fetch the JD content once. If the input is a **URL** (not pasted JD text), fetch
 **Pick exactly one method, in this priority order:**
 
 1. **Greenhouse JSON API (first try, if the URL is Greenhouse-backed):** If the pipeline.md entry carries `| gh={slug}/{id}` OR the URL host matches `*.greenhouse.io` / a known Greenhouse customer front-end (`*.pinterestcareers.com`, `okta.com/company/careers/opportunity/*`, `samsara.com/company/careers/roles/*`, `zoominfo.com/careers?gh_jid=*`, `collibra.com/.../?gh_jid=*`, `careers.toasttab.com/jobs?gh_jid=*`, `careers.airbnb.com/positions/*?gh_jid=*`, `coinbase.com/careers/positions/*?gh_jid=*`, `instacart.careers/job/?gh_jid=*`), extract `slug` and `id` and WebFetch `https://boards-api.greenhouse.io/v1/boards/{slug}/jobs/{id}`. 200 + JSON with `content` is the authoritative JD. 404 = genuinely closed (mark CLOSED and stop). **OpenCode WebFetch compatibility:** do not pass `format: "json"`; omit `format` or use `format: "text"` and parse the returned JSON text. **If 200, STOP — do not fall back to Geometra or WebFetch of the front-end.** The API is faster, cheaper (no Geometra session), and never returns a bot-shell.
-2. **Geometra MCP:** Most non-Greenhouse job portals (Lever, Ashby, Workday) are SPAs. Use `geometra_connect({ ..., headless: true, stealth: true })` + `geometra_page_model` to render and read the JD. **If this returns non-empty JD text, STOP — do not WebFetch the same URL.**
+2. **Direct Geometra helper:** Most non-Greenhouse job portals (Lever, Ashby, Workday) are SPAs. Use `npx job-forge portal:snapshot --url "{url}" --json` to render and read the page model/snapshot. This helper enforces `headless: true`, `stealth: true`, and `isolated: true` in code, reads `config/profile.yml` proxy config, and closes Chromium before exit. **If this returns non-empty JD text, STOP — do not WebFetch the same URL.**
 3. **WebFetch (only if Geometra is unavailable OR returned only a shell with no JD text):** For static pages (ZipRecruiter, WeLoveProduct, company career pages).
 4. **WebSearch (only if methods 1–3 all failed):** Search for the role title + company on secondary portals that index the JD in static HTML.
 
@@ -38,7 +38,7 @@ Execute the full `pdf` pipeline (read `modes/pdf.md`).
 
 Generate draft answers for the application form when the final score is >= 3.5. If the final score is >= 3.5 (per Canonical Scoring Model thresholds in `_shared.md`), generate draft answers for the application form:
 
-1. **Extract form questions**: Use Geometra MCP (`geometra_connect({ ..., headless: true, stealth: true })` + `geometra_form_schema`) to discover all form fields. **Reuse the same `sessionId` from Step 0** when the apply URL is the same rendered page; only connect again if the prior session ended or the URL changed. If questions cannot be extracted, use the generic questions.
+1. **Extract form questions**: Prefer `npx job-forge portal:form-schema --url "{apply_url}" --json` to discover all form fields without leaving a browser open. Use Geometra MCP only when a live multi-step browser session already exists and must be reused. If questions cannot be extracted, use the generic questions.
 2. **Generate answers** following the tone guidelines (see below).
 3. **Save in the report** as a `## G) Draft Application Answers` section.
 

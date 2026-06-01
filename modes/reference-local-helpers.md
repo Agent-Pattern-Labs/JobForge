@@ -10,6 +10,7 @@ Prefer a local helper when the workflow needs:
 - Machine-readable artifact validation.
 - Context, capability, or migration policy.
 - Dispatch planning or settlement.
+- One-shot rendered browser snapshots or form schemas.
 - Scoring, timing, priority, or lineage decisions.
 - Safe export checks.
 
@@ -26,6 +27,7 @@ Do not paste whole helper outputs into prompts unless the downstream agent needs
 | Artifact contracts | `templates/contracts.json` | `npx job-forge tracker-line ... --write`; `npx job-forge verify` |
 | Role capability policy | `templates/capabilities.json` | `npx job-forge capabilities:*` |
 | Context bundle policy | `templates/context.json` | `npx job-forge context:*` |
+| Browser snapshots / form schemas | Direct `@geometra/mcp` session module | `npx job-forge portal:*` |
 | JD/artifact reuse | `.jobforge-cache/` | `npx job-forge cache:*` |
 | Artifact lookup | `.jobforge-index.json` from `templates/index.json` | `npx job-forge index:*` |
 | Source-backed facts | `.jobforge-facts.json` from `templates/facts.json` | `npx job-forge facts:*` |
@@ -49,6 +51,7 @@ Do not paste whole helper outputs into prompts unless the downstream agent needs
 - For generated reports or PDFs reused after input changes, run `lineage:check --artifact <file>` if lineage exists; after creating derived artifacts, record them with `lineage:record --artifact <file> --input <source>...`.
 - Before exporting traces, prompts, reports, or fixtures outside the project, run `redact:scan`, `redact:apply`, or `redact:verify`.
 - When diagnosing consumer harness drift, run `migrate:plan` or `migrate:check`; `job-forge sync` applies safe migrations automatically unless `JOB_FORGE_SKIP_MIGRATIONS=1` is set.
+- When you only need a rendered page model, compact snapshot, or form schema from one URL, prefer `portal:snapshot` / `portal:form-schema` over Geometra MCP tool calls. Use MCP for interactive multi-step browser sessions.
 
 ## Enforcement
 

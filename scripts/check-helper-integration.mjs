@@ -20,6 +20,7 @@ const groups = [
   helper('trace', '@agent-pattern-labs/iso-trace', ['list', 'stats', 'show']),
   helper('telemetry', '', ['list', 'status', 'show', 'watch']),
   helper('guard', '@agent-pattern-labs/iso-guard', ['audit', 'explain'], { template: 'templates/guards/jobforge-baseline.yaml' }),
+  helper('portal', '@geometra/mcp', ['snapshot', 'form-schema', 'explain'], { migrated: true }),
   helper('ledger', '@agent-pattern-labs/iso-ledger', ['status', 'rebuild', 'verify', 'has', 'query'], { artifacts: ['.jobforge-ledger/'] }),
   helper('capabilities', '@agent-pattern-labs/iso-capabilities', ['list', 'explain', 'check', 'render'], { template: 'templates/capabilities.json', migrated: true }),
   helper('context', '@agent-pattern-labs/iso-context', ['list', 'explain', 'plan', 'check', 'render'], { template: 'templates/context.json', migrated: true }),

@@ -115,7 +115,7 @@ For customization (archetypes, weights, tone), start with `_shared.md` and [CUST
 ## Evaluation Flow (Single Offer)
 
 1. **Input**: User pastes JD text or URL
-2. **Extract**: Geometra MCP/WebFetch extracts JD from URL
+2. **Extract**: `job-forge portal:*`, Geometra MCP, or WebFetch extracts JD/form context from URL
 3. **Classify**: Detect archetype (one row from the archetype table in `modes/_shared.md`)
 4. **Evaluate**: 6 blocks (A-F).
    - A: Role summary.
@@ -251,6 +251,7 @@ Scripts maintain data consistency. In a consumer project they're invoked via the
 | `scripts/trace.mjs` | `npx job-forge trace:list` / `trace:stats` / `trace:show` | Local transcript observability via `@agent-pattern-labs/iso-trace`; common commands default to project-local sessions across supported harnesses |
 | `scripts/telemetry.mjs` | `npx job-forge telemetry:status` / `telemetry:show` | JobForge operational telemetry derived from normalized local traces plus tracker TSV state |
 | `scripts/guard.mjs` | `npx job-forge guard:audit` / `guard:explain` | Deterministic `@agent-pattern-labs/iso-guard` policy audits over local normalized traces (with OpenCode `task` rules still available where relevant) |
+| `scripts/portal.mjs` | `npx job-forge portal:snapshot` / `portal:form-schema` | Deterministic direct-Geometra one-shot browser snapshots and form schemas with JobForge browser defaults enforced in code |
 | `scripts/ledger.mjs` | `npx job-forge ledger:status` / `ledger:has` / `ledger:rebuild` | Deterministic `@agent-pattern-labs/iso-ledger` state over tracker, TSV, and pipeline files |
 | `scripts/capabilities.mjs` | `npx job-forge capabilities:check` / `capabilities:explain` | Deterministic `@agent-pattern-labs/iso-capabilities` role boundary checks for tools, MCPs, commands, filesystem, and network access |
 | `scripts/cache.mjs` | `npx job-forge cache:has` / `cache:get` / `cache:put` | Deterministic `@agent-pattern-labs/iso-cache` JD and artifact reuse keyed by stable job/url inputs |
