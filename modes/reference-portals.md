@@ -145,4 +145,20 @@ Use `npx job-forge portal:snapshot --url "{url}" --json` or `npx job-forge porta
 
 `job-forge mcp:geometra` resolves Geometra in this order: `JOB_FORGE_GEOMETRA_MCP_PATH`, then `package.json -> jobForge.geometraMcpPath`, then `opencode.json -> mcp.geometra.environment.JOB_FORGE_GEOMETRA_MCP_PATH`, then a sibling local `../geometra/mcp/dist/index.js` checkout for maintainers working across both repos, then the pinned npm fallback.
 
+JobForge's Geometra launcher writes a durable lifecycle log at `.jobforge-mcp/geometra-mcp.jsonl` in the consumer project. The log is JSONL and does not use stdout, so it does not interfere with the MCP stdio protocol. Expected events include `launcher_start`, `child_spawn`, periodic `heartbeat`, `child_stderr`, `signal_received`, `child_error`, and `child_exit`. Override the location with `JOB_FORGE_GEOMETRA_MCP_LOG_PATH`, disable it with `JOB_FORGE_GEOMETRA_MCP_LOG=0`, or tune the heartbeat with `JOB_FORGE_GEOMETRA_MCP_HEARTBEAT_MS`.
+
 To check or modify MCP settings, edit `opencode.json` in the project root.
+
+## Silent MCP Death Diagnostics
+
+If Geometra MCP vanishes with no stderr, no crash log, and subsequent calls return `Not connected`, inspect the lifecycle log before making a claim:
+
+```bash
+tail -40 .jobforge-mcp/geometra-mcp.jsonl
+```
+
+- Last event is `signal_received`: the MCP host or parent process sent a catchable signal such as `SIGTERM`.
+- Last event is `child_exit`: the Geometra child process exited and the log should show its code or signal.
+- Last event is `child_stderr`: preserve the stderr text; it is the best upstream bug report payload.
+- Last event is an old `heartbeat` with no later `signal_received` or `child_exit`: likely host `SIGKILL`, OS kill, or wrapper process death. No process can log after `SIGKILL`, so report the heartbeat timestamp and the missing exit event.
+- No `launcher_start`: OpenCode never started JobForge's Geometra launcher, or it used a different MCP command/config.

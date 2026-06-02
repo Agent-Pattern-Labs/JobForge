@@ -31,6 +31,9 @@ AI-powered job search pipeline: scans portals, evaluates offers, generates CVs v
 - [H8] Never paste proxy values from `config/profile.yml` into `task` prompts, status text, or summaries. If a proxy is configured, tell the subagent exactly: "Proxy is configured; read `config/profile.yml` and pass its top-level `proxy:` object plus `headless: true` and `stealth: true` to every `geometra_connect` call and every Geometra auto-connect call that passes `pageUrl` or `url`." Do not transcribe `server`, `username`, `password`, or `bypass`, even if you just read them from disk.
   why: a 2026-04-25 OpenCode trace showed raw proxy credentials copied into an apply subagent prompt; trace logs are local, but prompts must still avoid replicating secrets across subagent sessions. Geometra MCP opens visible Chromium unless `headless: true` is explicit, and Geometra MCP >=1.61.3 can launch CloakBrowser stealth Chromium via `stealth: true`; both flags belong with JobForge portal sessions instead of stock visible Playwright Chromium
 
+- [H9] If Geometra MCP disappears, becomes unresponsive, or returns a cascade of `Not connected` after a live form-fill, inspect `.jobforge-mcp/geometra-mcp.jsonl` before guessing. Report the last `launcher_start`, `child_spawn`, `heartbeat`, `signal_received`, `child_stderr`, and `child_exit` events plus the timestamp gap from the last heartbeat. If the last event is an old heartbeat with no `signal_received` / `child_exit`, treat it as likely host SIGKILL or external process death.
+  why: OpenCode or the OS can kill the MCP server without stderr, crash logs, or core dumps. JobForge's MCP launcher writes durable lifecycle events outside MCP stdout, so silent disappearances still leave enough evidence to distinguish host kill, child crash, stderr failure, and wrapper health
+
 ## Defaults
 
 - [D1] Delegate to a subagent (`task`) only when the work involves repeated tool-heavy steps that bloat the cache prefix: applying to N≥2 jobs, batch scans hitting ≥3 companies, or any "apply to… / process pipeline / batch evaluate" user phrasing. Single-offer evals, dev work, file edits, `tracker` mode, single-URL checks, and one-shot questions stay inline.
@@ -62,7 +65,7 @@ AI-powered job search pipeline: scans portals, evaluates offers, generates CVs v
 1. Check `cv.md`, `profile.yml`, and `portals.yml`; onboard if any file is missing.
 2. Pick and name the mode from **Routing** [D6]. No match → ask; do not guess.
 3. Read the active mode file [D3]. Use local helpers when they can replace broad file reads, prose math, manual policy checks, or artifact reuse decisions [D8]. Decide inline vs delegated work [D1].
-4. Prepare Geometra dispatches: cleanup [H3], local-helper prefilters when useful [D8], dedupe [H2], location filter [D5], file-backed preflight plan/check [D8], routing [D2], proxy/headless/stealth prompt hygiene [H8].
+4. Prepare Geometra dispatches: cleanup [H3], local-helper prefilters when useful [D8], dedupe [H2], location filter [D5], file-backed preflight plan/check [D8], routing [D2], proxy/headless/stealth prompt hygiene [H8], MCP lifecycle log awareness [H9].
 5. Dispatch at most 2 tasks per round [H1]; wait for final outcomes, not just task ids [H5b], then settle the round with postflight status [D8].
 6. Keep multi-job form-filling out of the orchestrator [H4].
 7. Cross-check subagent facts against authoritative files [H7].

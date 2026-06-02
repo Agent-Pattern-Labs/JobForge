@@ -414,6 +414,7 @@ data/timeline-events.jsonl
 .jobforge-prioritize.json
 .jobforge-prioritize-items.json
 .jobforge-lineage.json
+.jobforge-mcp/
 .jobforge-runs/
 .jobforge-redacted/
 reports/

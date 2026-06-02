@@ -38,6 +38,7 @@ portals.yml
 .jobforge-prioritize.json
 .jobforge-prioritize-items.json
 .jobforge-lineage.json
+.jobforge-mcp/
 .jobforge-redacted/
 node_modules/
 

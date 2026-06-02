@@ -4,8 +4,8 @@ Live application assistant. Reads the active application form in Chrome (via Geo
 
 ## Hard limits
 
-- [H1] Submit the form in a single `geometra_run_actions` call that chains upload + fill + pick + submit. Never split upload / fill / submit across multiple tool calls.
-  why: Greenhouse-style forms regenerate internal field IDs after any DOM-mutating action (especially file uploads); multi-call sequences see stale IDs, enter a retry loop, and burn tens of thousands of tokens (4-retry Anthropic FDE trace, ~10K wasted tokens)
+- [H1] Submit the form with one stable `geometra_run_actions` action array that chains upload + fill + pick + submit. Set `softTimeoutMs: 45000`, `output: "final"`, and `includeSteps: false`; if Geometra returns `paused: true` with `resumeFromIndex`, immediately continue with the exact same `actions` array and that `resumeFromIndex`. Never split upload / fill / submit across separate direct tools or rebuilt action arrays.
+  why: Greenhouse-style forms regenerate internal field IDs after any DOM-mutating action (especially file uploads); multi-call sequences see stale IDs, enter a retry loop, and burn tens of thousands of tokens. The soft-timeout continuation keeps the MCP call under host timeout without changing the action array or restarting the application
 
 - [H2] Never auto-retry a failed submit. On recovery failure, report the error to the orchestrator and stop. The orchestrator decides whether to re-dispatch.
   why: duplicate applications are worse than a missed retry — ATS portals often accept a submit whose response was dropped mid-flight, so a retry double-submits. A human must decide.
@@ -64,7 +64,7 @@ Live application assistant. Reads the active application form in Chrome (via Geo
 9. Route high-stakes applications through `@general-paid` [D8].
 10. Extract form questions; classify each Section-G vs new.
 11. Generate answers from Block B + Block F + Section G + JD.
-12. Submit as ONE `run_actions` call [H1] using labels [D6] with `imeFriendly: true` [D4].
+12. Submit via one stable `run_actions` action array [H1] using labels [D6], `imeFriendly: true` [D4], `softTimeoutMs: 45000`, `output: "final"`, and `includeSteps: false`.
 13. On session error, run the 4-step recovery; only one retry [H2].
 14. On provider failure, stop and inspect telemetry before any retry [D9].
 15. On OTP prompt, fetch the code from Gmail via `gmail_get_message`.
@@ -308,13 +308,16 @@ Notes:
 
 When the candidate asks you to actually submit (or when running in auto-pipeline mode at score ≥ 3.0), follow these rules **strictly**. Greenhouse-style forms regenerate internal field IDs after any DOM-mutating action, especially file uploads. That breaks multi-call fill sequences and forces the model into a retry loop that burns tens of thousands of tokens.
 
-### Use one `run_actions` call (Rule A — never split)
+### Use one stable `run_actions` action array (Rule A — never split)
 
-Do the entire submission in a **single** `geometra_run_actions` call that chains all steps. Never split upload / fill / submit across multiple tool calls.
+Do the entire submission with one stable `geometra_run_actions` `actions` array that chains all steps. Never split upload / fill / submit across separate direct tools, and never rebuild the action array between continuations.
 
 ```
 geometra_run_actions({
   sessionId: "...",
+  softTimeoutMs: 45000,
+  output: "final",
+  includeSteps: false,
   actions: [
     { type: "upload_files",  fieldLabel: "Resume/CV", paths: ["/abs/path/cv.pdf"] },
     { type: "fill_fields",   imeFriendly: true,
@@ -325,6 +328,8 @@ geometra_run_actions({
   ]
 })
 ```
+
+If the response contains `paused: true`, `pauseReason: "soft-timeout"`, and `resumeFromIndex`, call `geometra_run_actions` again immediately with the same `sessionId`, the exact same `actions` array, `softTimeoutMs: 45000`, `output: "final"`, `includeSteps: false`, and `resumeFromIndex` set to the returned value. This is a continuation, not a retry, and it is the host-safe path for long Samsara/Greenhouse-style embeds. Stop only if the continued call fails, not merely because it paused.
 
 **Always pass `imeFriendly: true` on `fill_fields` for Ashby** (and safe as a default everywhere). Ashby's React form swallows programmatic text input silently — visible value looks correct, `invalidCount` stays >0, and Submit fails with "field required" or "flagged as possible spam." `imeFriendly: true` fires proper composition events that clear React's internal validity state. Confirmed fix: Supabase #793 (2026-04-19). Zero cost on other portals; no reason to leave it off.
 
@@ -356,6 +361,9 @@ Call 3:  geometra_connect({
          })
 Call 4:  geometra_run_actions({
            sessionId: "<new sessionId from Call 3>",
+           softTimeoutMs: 45000,
+           output: "final",
+           includeSteps: false,
            actions: [... the EXACT same actions array you used before ...]
          })
 ```
@@ -365,7 +373,8 @@ Call 4:  geometra_run_actions({
 1. **Always run all 4 calls.** Do not skip Call 1 or Call 2 even if Call 1 shows an empty pool.
 2. **Do not re-fetch the form schema.** Do not call `geometra_form_schema` between Call 3 and Call 4. Your labels haven't changed, so the same `actions` array still works.
 3. **Do not edit the actions array.** Copy it verbatim from your first attempt. Do not re-pick fieldIds. Do not add or remove actions. Same array in, same array out.
-4. **Only ONE retry.** If Call 4 ALSO fails, STOP. Return this exact message to the orchestrator:
+4. **Soft-timeout pause is not failure.** If Call 4 returns `paused: true`, continue with the returned `resumeFromIndex` and the exact same action array. Do not count this as the one retry.
+5. **Only ONE retry.** If Call 4 ALSO fails, STOP. Return this exact message to the orchestrator:
 
    ```
    APPLY FAILED AFTER RECOVERY: <URL>

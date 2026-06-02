@@ -159,6 +159,8 @@ Subagents launched via the `task` tool start with a fresh context and cannot aut
 
 **Fix in one sentence:** ALWAYS run `geometra_list_sessions` + `geometra_disconnect` BEFORE `geometra_connect`. Every time. No exceptions except the one explicit exception below.
 
+If Geometra MCP itself disappears or becomes unresponsive, inspect `.jobforge-mcp/geometra-mcp.jsonl` before escalating. `signal_received` means the MCP host or parent process sent a catchable signal, `child_exit` means the Geometra child exited, `child_stderr` preserves stderr that may not show in the agent transcript, and a final stale `heartbeat` with no later event usually means SIGKILL / host reap / OS kill. Report the final event type and timestamp rather than saying only "MCP crashed."
+
 ---
 
 #### Rule 1 — Orchestrator pre-dispatch cleanup (DO THIS EVERY TIME)

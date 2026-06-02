@@ -112,6 +112,7 @@
             ".jobforge-prioritize.json",
             ".jobforge-prioritize-items.json",
             ".jobforge-lineage.json",
+            ".jobforge-mcp/",
             ".jobforge-redacted/",
             "data/timeline-events.jsonl",
             "batch/preflight-candidates.json",
