@@ -169,6 +169,7 @@ data/pipeline.md        →  Pending URLs and `local:jds/...` inbox (see modes/p
 .jobforge-timeline.json  →  Deterministic follow-up action plan built from templates/timeline.json
 .jobforge-prioritize.json → Deterministic next-action priority queue built from templates/prioritize.json
 .jobforge-lineage.json   →  Artifact lineage graph for stale report/PDF checks
+.jobforge-receipts/      →  Portable evidence receipts for side-effect, handoff, release, blocked-site, and repro boundaries
 jds/*.md                 →  Saved job descriptions referenced from the pipeline (`local:jds/{file}`)
 templates/states.yml     →  Canonical status values
 templates/canon.json      →  Canonical URL/company/role identity keys
@@ -197,6 +198,7 @@ Create `data/pipeline.md` when you start using the URL inbox (`/job-forge pipeli
 - Timeline: `.jobforge-timeline.json` (created on demand by `job-forge timeline:*`; gitignored local next-action state)
 - Prioritize: `.jobforge-prioritize.json` and `.jobforge-prioritize-items.json` (created on demand by `job-forge prioritize:*`; gitignored local ranking state)
 - Lineage: `.jobforge-lineage.json` (created by `job-forge lineage:record`; gitignored local stale-output state)
+- Receipts: `.jobforge-receipts/*.agent.zip` (created by `job-forge receipts:create` / `receipts:capture`; gitignored local evidence bundles)
 - Canon: `templates/canon.json` (identity rules inspected with `job-forge canon:*`)
 - Score: `templates/score.json` (weighted rubric and gates inspected with `job-forge score:*`)
 - Timeline policy: `templates/timeline.json` (follow-up windows inspected with `job-forge timeline:*`)
@@ -266,6 +268,7 @@ Scripts maintain data consistency. In a consumer project they're invoked via the
 | `scripts/preflight.mjs` | `npx job-forge preflight:plan` / `preflight:check` / `preflight:explain` | Deterministic `@agent-pattern-labs/iso-preflight` dispatch planning for file-backed candidate facts and gates |
 | `scripts/postflight.mjs` | `npx job-forge postflight:status` / `postflight:check` / `postflight:explain` | Deterministic `@agent-pattern-labs/iso-postflight` settlement for dispatch outcomes, required tracker TSV artifacts, and merge/verify post-steps |
 | `scripts/redact.mjs` | `npx job-forge redact:scan` / `redact:apply` / `redact:verify` | Deterministic `@agent-pattern-labs/iso-redact` safe-export scanning and sanitization for traces, prompts, reports, and fixtures |
+| `scripts/receipts.mjs` | `npx job-forge receipts:create` / `receipts:verify` / `receipts:redact` | Portable JobForge evidence receipts for side-effect, release, blocked-site, repro, and inter-agent handoff boundaries |
 | `scripts/migrate.mjs` | `npx job-forge migrate:plan` / `migrate:apply` / `migrate:check` | Deterministic `@agent-pattern-labs/iso-migrate` consumer-project upgrades for scripts and generated-artifact ignores |
 | `scripts/check-helper-integration.mjs` | `npm run lint:helpers` | Integration lint that keeps helper packages, scripts, scaffolder defaults, migrations, generated ignores, docs, and `modes/reference-local-helpers.md` aligned |
 | `tracker-lib.mjs` | _(library)_ | Shared helpers for reading/writing day-based tracker files — imported by merge/dedup/verify/normalize |

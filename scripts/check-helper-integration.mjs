@@ -35,6 +35,7 @@ const groups = [
   helper('prioritize', '@agent-pattern-labs/iso-prioritize', ['status', 'items', 'build', 'rank', 'select', 'check', 'verify', 'explain'], { template: 'templates/prioritize.json', artifacts: ['.jobforge-prioritize.json', '.jobforge-prioritize-items.json'], migrated: true }),
   helper('lineage', '@agent-pattern-labs/iso-lineage', ['status', 'record', 'check', 'stale', 'verify', 'explain'], { artifacts: ['.jobforge-lineage.json'], migrated: true }),
   helper('redact', '@agent-pattern-labs/iso-redact', ['scan', 'verify', 'apply', 'explain'], { template: 'templates/redact.json', artifacts: ['.jobforge-redacted/'], migrated: true }),
+  helper('receipts', '', ['create', 'capture', 'verify', 'inspect', 'redact', 'path'], { artifacts: ['.jobforge-receipts/'], migrated: true }),
   helper('migrate', '@agent-pattern-labs/iso-migrate', ['plan', 'apply', 'check', 'explain'], { template: 'templates/migrations.json', migrated: true }),
 ];
 

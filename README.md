@@ -65,7 +65,7 @@ JobForge is built for selective, high-fit applications. It is not intended for s
 - Scans configured company portals and job boards.
 - Tracks applications, follow-ups, rejections, offers, reports, and PDFs.
 - Supports batch evaluation and application work through bounded subagents.
-- Uses local helper CLIs for dedupe, scoring, lineage, preflight, postflight, and tracker integrity.
+- Uses local helper CLIs for dedupe, scoring, lineage, preflight, postflight, receipts, and tracker integrity.
 
 ## Common Commands
 
@@ -78,6 +78,7 @@ Run these from your personal project root after `npm install`.
 | Merge batch tracker additions | `npx job-forge merge` |
 | Generate a CV PDF from the current project | `npx job-forge pdf` |
 | Show token usage | `npx job-forge tokens --days 1` |
+| Create a verifiable evidence receipt | `npx job-forge receipts:create --artifact <file>` |
 | Rebuild harness symlinks | `npx job-forge sync` |
 | Upgrade the harness | `npm run update-harness` |
 

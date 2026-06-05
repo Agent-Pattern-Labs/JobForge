@@ -1,6 +1,6 @@
 {
   "name": "job-forge",
-  "version": "2.14.46",
+  "version": "2.14.47",
   "description": "AI-powered job search pipeline built on opencode",
   "type": "module",
   "bin": {
@@ -106,6 +106,12 @@
     "redact:verify": "node bin/job-forge.mjs redact:verify",
     "redact:apply": "node bin/job-forge.mjs redact:apply",
     "redact:explain": "node bin/job-forge.mjs redact:explain",
+    "receipts:create": "node bin/job-forge.mjs receipts:create",
+    "receipts:capture": "node bin/job-forge.mjs receipts:capture",
+    "receipts:verify": "node bin/job-forge.mjs receipts:verify",
+    "receipts:inspect": "node bin/job-forge.mjs receipts:inspect",
+    "receipts:redact": "node bin/job-forge.mjs receipts:redact",
+    "receipts:path": "node bin/job-forge.mjs receipts:path",
     "migrate:plan": "node bin/job-forge.mjs migrate:plan",
     "migrate:apply": "node bin/job-forge.mjs migrate:apply",
     "migrate:check": "node bin/job-forge.mjs migrate:check",
@@ -195,6 +201,7 @@
     "@agent-pattern-labs/iso-postflight": "^0.1.1",
     "@agent-pattern-labs/iso-preflight": "^0.1.1",
     "@agent-pattern-labs/iso-prioritize": "^0.1.1",
+    "@agent-pattern-labs/iso-receipts": "^0.1.0",
     "@agent-pattern-labs/iso-redact": "^0.1.1",
     "@agent-pattern-labs/iso-score": "^0.1.1",
     "@agent-pattern-labs/iso-timeline": "^0.1.1",

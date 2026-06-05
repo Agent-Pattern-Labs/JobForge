@@ -198,6 +198,12 @@ const consumerPkg = {
     'redact:verify': 'job-forge redact:verify',
     'redact:apply': 'job-forge redact:apply',
     'redact:explain': 'job-forge redact:explain',
+    'receipts:create': 'job-forge receipts:create',
+    'receipts:capture': 'job-forge receipts:capture',
+    'receipts:verify': 'job-forge receipts:verify',
+    'receipts:inspect': 'job-forge receipts:inspect',
+    'receipts:redact': 'job-forge receipts:redact',
+    'receipts:path': 'job-forge receipts:path',
     'migrate:plan': 'job-forge migrate:plan',
     'migrate:apply': 'job-forge migrate:apply',
     'migrate:check': 'job-forge migrate:check',
@@ -317,6 +323,7 @@ Before doing any work, remember where things live in *this* project:
 | Dispatch preflight policy | \`templates/preflight.json\` | Safe apply rounds/gates; use \`job-forge preflight:*\` |
 | Dispatch postflight policy | \`templates/postflight.json\` | Safe apply settlement; use \`job-forge postflight:*\` |
 | Consumer migrations | \`templates/migrations.json\` | Safe script/gitignore upgrades; use \`job-forge migrate:*\` |
+| Evidence receipts | \`.jobforge-receipts/\` | Portable verifiable work receipts; use \`job-forge receipts:*\` |
 | Scanner config | \`portals.yml\` (project root) | Company configs |
 | Profile / identity | \`config/profile.yml\` | Candidate name, email, target roles |
 | CV | \`cv.md\` (project root) | Markdown, source of truth |
@@ -417,6 +424,7 @@ data/timeline-events.jsonl
 .jobforge-mcp/
 .jobforge-runs/
 .jobforge-redacted/
+.jobforge-receipts/
 reports/
 !reports/.gitkeep
 batch/batch-state.tsv

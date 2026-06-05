@@ -13,6 +13,7 @@ Prefer a local helper when the workflow needs:
 - One-shot rendered browser snapshots or form schemas.
 - Scoring, timing, priority, or lineage decisions.
 - Safe export checks.
+- Evidence bundles at side-effect, release, handoff, blocked-site, or repro boundaries.
 
 Do not paste whole helper outputs into prompts unless the downstream agent needs that exact file-backed result. Prefer passing paths, ids, keys, and short summaries.
 
@@ -40,6 +41,7 @@ Do not paste whole helper outputs into prompts unless the downstream agent needs
 | Follow-up timing | `templates/timeline.json` | `npx job-forge timeline:*` |
 | Next-action ranking | `templates/prioritize.json` | `npx job-forge prioritize:*` |
 | Artifact lineage | `.jobforge-lineage.json` | `npx job-forge lineage:*` |
+| Evidence receipts | `.jobforge-receipts/` | `npx job-forge receipts:*` |
 
 ## Mandatory Uses
 
@@ -50,6 +52,7 @@ Do not paste whole helper outputs into prompts unless the downstream agent needs
 - For next-action or replacement-candidate selection, run `prioritize:build` or `prioritize:select --limit N`.
 - For generated reports or PDFs reused after input changes, run `lineage:check --artifact <file>` if lineage exists; after creating derived artifacts, record them with `lineage:record --artifact <file> --input <source>...`.
 - Before exporting traces, prompts, reports, or fixtures outside the project, run `redact:scan`, `redact:apply`, or `redact:verify`.
+- After irreversible or trust-sensitive actions, create a receipt with `receipts:create` from the relevant tracker TSV, report, portal snapshot/form schema, and filtered ledger events. Use `receipts:verify` before treating a receipt as a workflow gate, and `receipts:redact` before sharing it outside the project.
 - When diagnosing consumer harness drift, run `migrate:plan` or `migrate:check`; `job-forge sync` applies safe migrations automatically unless `JOB_FORGE_SKIP_MIGRATIONS=1` is set.
 - When you only need a rendered page model, compact snapshot, or form schema from one URL, prefer `portal:snapshot` / `portal:form-schema` over Geometra MCP tool calls. Use MCP for interactive multi-step browser sessions.
 

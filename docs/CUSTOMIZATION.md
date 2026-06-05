@@ -190,6 +190,10 @@ Application settlement policy lives in `templates/postflight.json` and is checke
 
 Safe-export redaction rules live in `templates/redact.json` and are enforced locally by `@agent-pattern-labs/iso-redact`. Use `job-forge redact:scan --input <file>` before sharing traces, prompts, reports, or fixtures outside the project, `job-forge redact:apply --input <file> --output .jobforge-redacted/<file>` to write a sanitized copy, and `job-forge redact:verify --input <file>` to fail if secrets or configured PII remain. Findings never print matched values. This is not an MCP and does not add prompt or tool-schema tokens.
 
+## JobForge evidence receipts
+
+Evidence receipts live under `.jobforge-receipts/` and are created locally by `job-forge receipts:*`. Use them at side-effect boundaries such as application submission, blocked-site manual handoff, release, repro, or inter-agent handoff. `receipts:create` can attach tracker TSVs, reports, portal snapshots/form schemas, Geometra replay files, filtered ledger events, proof payloads, and verdicts; `receipts:verify` checks manifest hashes; `receipts:redact` applies `templates/redact.json` before sharing. Routine reads and ordinary local edits do not need receipts.
+
 ## JobForge consumer migrations
 
 Consumer-project migrations live in `templates/migrations.json` and are applied locally by `@agent-pattern-labs/iso-migrate`. `job-forge sync` applies safe migrations automatically after refreshing symlinks; use `JOB_FORGE_SKIP_MIGRATIONS=1` to opt out. Use `job-forge migrate:plan`, `job-forge migrate:apply`, and `job-forge migrate:check` to inspect or enforce script/gitignore drift explicitly. This is not an MCP and does not add prompt or tool-schema tokens.

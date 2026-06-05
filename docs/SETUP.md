@@ -145,6 +145,8 @@ From your project root, these commands maintain the tracker and pipeline checks.
 | Fail unless dispatch outcomes and post-steps are complete | `npx job-forge postflight:check --plan batch/preflight-plan.json --outcomes batch/postflight-outcomes.json` | `npm run postflight:check -- --plan ... --outcomes ...` |
 | Sanitize local text before exporting it | `npx job-forge redact:apply --input raw-session.jsonl --output .jobforge-redacted/session.jsonl` | `npm run redact:apply -- --input ... --output ...` |
 | Verify local text is safe to export | `npx job-forge redact:verify --input .jobforge-redacted/session.jsonl` | `npm run redact:verify -- --input ...` |
+| Create a verifiable work receipt | `npx job-forge receipts:create --company "Acme" --role "Staff Engineer" --artifact batch/tracker-additions/example.tsv --include-ledger` | `npm run receipts:create -- --company ... --role ... --artifact ... --include-ledger` |
+| Verify or redact a receipt | `npx job-forge receipts:verify .jobforge-receipts/example.agent.zip` | `npm run receipts:verify -- .jobforge-receipts/example.agent.zip` |
 | Inspect pending consumer migrations | `npx job-forge migrate:plan` | `npm run migrate:plan` |
 | Map status column to canonical labels | `npx job-forge normalize` | `npm run normalize` |
 | Merge duplicate company/role rows | `npx job-forge dedup` | `npm run dedup` |

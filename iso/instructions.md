@@ -25,7 +25,7 @@ AI-powered job search pipeline: scans portals, evaluates offers, generates CVs v
 - [H6] Application outcomes flow through `batch/tracker-additions/*.tsv`, not `data/pipeline.md`. After any multi-apply run, the orchestrator MUST run `npx job-forge merge` then `npx job-forge verify` before ending the session.
   why: `pipeline.md` is the URL inbox (`[ ]` pending → `[x]` processed); `data/applications/YYYY-MM-DD.md` is the outcome log; the TSV pathway is the only safe bridge because `merge` handles column order and duplicate detection
 
-- [H7] Load-bearing facts passed to downstream subagents must originate from a file, not from prior subagent prose. Authoritative sources: `data/pipeline.md`, `data/scan-history.tsv`, `batch/scan-output-*.md`, `reports/{num}-*.md` with `**URL:**` / `**Score:**` headers, emitted score JSON validated by `npx job-forge score:check --input ...`, `batch/tracker-additions/*.tsv`, cached JD content returned by `npx job-forge cache:get --url ...`, source path/line pointers returned by `npx job-forge index:query ...`, materialized fact records returned by `npx job-forge facts:query ...`, selected next actions returned by `npx job-forge prioritize:select ...`, and lineage records returned by `npx job-forge lineage:explain ...`.
+- [H7] Load-bearing facts passed to downstream subagents must originate from a file, not from prior subagent prose. Authoritative sources: `data/pipeline.md`, `data/scan-history.tsv`, `batch/scan-output-*.md`, `reports/{num}-*.md` with `**URL:**` / `**Score:**` headers, emitted score JSON validated by `npx job-forge score:check --input ...`, `batch/tracker-additions/*.tsv`, cached JD content returned by `npx job-forge cache:get --url ...`, source path/line pointers returned by `npx job-forge index:query ...`, materialized fact records returned by `npx job-forge facts:query ...`, selected next actions returned by `npx job-forge prioritize:select ...`, lineage records returned by `npx job-forge lineage:explain ...`, and verified `.jobforge-receipts/*.agent.zip` paths checked with `npx job-forge receipts:verify ...`.
   why: 2026-04-18 scan subagent returned 30 fabricated Greenhouse IDs in prose (plausible-looking, non-existent); orchestrator dispatched 30 downstream subagents that all 404'd. Subagents can hallucinate IDs, scores, and confirmation text — round-trip through a file or don't trust the value
 
 - [H8] Never paste proxy values from `config/profile.yml` into `task` prompts, status text, or summaries. If a proxy is configured, tell the subagent exactly: "Proxy is configured; read `config/profile.yml` and pass its top-level `proxy:` object plus `headless: true`, `browserMode: \"stock\"`, `blockDetection: true`, and `blockedSitePolicy: \"manual-handoff\"` to every `geometra_connect` call and every Geometra auto-connect call that passes `pageUrl` or `url`." Do not transcribe `server`, `username`, `password`, or `bypass`, even if you just read them from disk.
@@ -57,7 +57,7 @@ AI-powered job search pipeline: scans portals, evaluates offers, generates CVs v
 - [D7] For standalone `batch` runs, prefer `batch/batch-runner.sh` instead of hand-rolling the loop. It delegates to `@agent-pattern-labs/iso-orchestrator`, persists workflow records in `.jobforge-runs/`, caps bundle fan-out, and mutexes state/report-number writes. Use `JOBFORGE_LEGACY_BATCH_RUNNER=1` only as a fallback.
   why: the old Bash loop encoded resumability and parallelism manually; the iso-orchestrator path makes the durable control state inspectable and prevents report-number collisions under parallel bundles
 
-- [D8] Use deterministic local helpers instead of prose when they can answer or validate state, identity, policy, scoring, timing, dispatch, priority, lineage, migration, or safe-export questions. Read `modes/reference-local-helpers.md` when choosing a helper or changing helper wiring.
+- [D8] Use deterministic local helpers instead of prose when they can answer or validate state, identity, policy, scoring, timing, dispatch, priority, lineage, migration, receipts, or safe-export questions. Read `modes/reference-local-helpers.md` when choosing a helper or changing helper wiring.
   why: the helper ecosystem is now broad enough that repeating every command in the shared prefix wastes cache budget; the reference keeps operational details on demand while `npm run lint:helpers` enforces integration drift in code
 
 ## Procedure
@@ -71,7 +71,7 @@ AI-powered job search pipeline: scans portals, evaluates offers, generates CVs v
 7. Cross-check subagent facts against authoritative files [H7].
 8. Apply score gate [D4, D8].
 9. Merge contract-validated TSV outcomes [H6, D8].
-10. Verify tracker and run postflight check before ending [H6, D8].
+10. Verify tracker and run postflight check before ending [H6, D8]. For irreversible or trust-sensitive boundaries only (application submitted, blocked-site manual handoff, release, repro, inter-agent handoff), create and verify a receipt from the relevant artifacts with `npx job-forge receipts:create ...` and `npx job-forge receipts:verify ...` [D8].
 
 ## Routing
 

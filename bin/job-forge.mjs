@@ -36,6 +36,7 @@
  *   prioritize:*   Rank local next-action queues via iso-prioritize
  *   lineage:*      Record artifact lineage and stale outputs via iso-lineage
  *   redact:*       Sanitize local exports via iso-redact
+ *   receipts:*     Create/verify/redact portable JobForge evidence receipts
  *   migrate:*      Apply deterministic consumer-project migrations via iso-migrate
  *   sync           Re-run the harness symlink sync (bin/sync.mjs)
  *   help, --help   Show this message
@@ -230,6 +231,15 @@ const redactAliases = {
   'redact:path': 'path',
 };
 
+const receiptsAliases = {
+  'receipts:create': 'create',
+  'receipts:capture': 'capture',
+  'receipts:verify': 'verify',
+  'receipts:inspect': 'inspect',
+  'receipts:redact': 'redact',
+  'receipts:path': 'path',
+};
+
 const migrateAliases = {
   'migrate:plan': 'plan',
   'migrate:apply': 'apply',
@@ -332,6 +342,11 @@ Commands:
   redact:verify           Fail if local text still contains sensitive values
   redact:apply            Write a sanitized copy of local text
   redact:explain          Show the active redaction policy
+  receipts:create         Create a portable receipt from JobForge artifacts
+  receipts:capture        Capture a command's stdout/stderr into a receipt
+  receipts:verify         Verify a receipt manifest and artifact hashes
+  receipts:inspect        Summarize a receipt without unpacking it
+  receipts:redact         Redact a receipt with templates/redact.json
   migrate:plan            Preview deterministic consumer-project migrations
   migrate:apply           Apply deterministic consumer-project migrations
   migrate:check           Fail if migrations are pending
@@ -394,6 +409,8 @@ Pass --help after a command to see its own flags, e.g.:
   job-forge lineage:check --artifact reports/123-acme-2026-04-27.md
   job-forge redact:scan --input raw-session.jsonl
   job-forge redact:apply --input raw-session.jsonl --output .jobforge-redacted/session.jsonl
+  job-forge receipts:create --company "Acme" --role "Staff Engineer" --artifact batch/tracker-additions/123-acme.tsv --include-ledger
+  job-forge receipts:verify .jobforge-receipts/receipt.agent.zip
   job-forge migrate:check
   job-forge migrate:apply
 
@@ -667,6 +684,21 @@ if (cmd === 'redact' || redactAliases[cmd]) {
 
   const scriptPath = join(PKG_ROOT, 'scripts/redact.mjs');
   const result = spawnSync(process.execPath, [scriptPath, ...redactArgs], {
+    stdio: 'inherit',
+    cwd: PROJECT_DIR,
+    env: process.env,
+  });
+
+  process.exit(result.status ?? 1);
+}
+
+if (cmd === 'receipts' || receiptsAliases[cmd]) {
+  const receiptsArgs = cmd === 'receipts'
+    ? (rest.length === 0 ? ['help'] : rest)
+    : [receiptsAliases[cmd], ...rest];
+
+  const scriptPath = join(PKG_ROOT, 'scripts/receipts.mjs');
+  const result = spawnSync(process.execPath, [scriptPath, ...receiptsArgs], {
     stdio: 'inherit',
     cwd: PROJECT_DIR,
     env: process.env,
