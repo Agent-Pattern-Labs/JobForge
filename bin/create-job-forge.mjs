@@ -245,8 +245,8 @@ const opencodeCfg = {
       type: 'local',
       command: ['npx', '--no-install', 'job-forge', 'mcp:geometra'],
       environment: {
-        GEOMETRA_STEALTH: '1',
-        GEOMETRA_BROWSER: 'stealth',
+        GEOMETRA_STEALTH: '0',
+        GEOMETRA_BROWSER: 'stock',
       },
       enabled: true,
     },

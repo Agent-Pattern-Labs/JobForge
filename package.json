@@ -1,6 +1,6 @@
 {
   "name": "job-forge",
-  "version": "2.14.45",
+  "version": "2.14.46",
   "description": "AI-powered job search pipeline built on opencode",
   "type": "module",
   "bin": {
@@ -199,7 +199,7 @@
     "@agent-pattern-labs/iso-score": "^0.1.1",
     "@agent-pattern-labs/iso-timeline": "^0.1.1",
     "@agent-pattern-labs/iso-trace": "^0.5.1",
-    "@geometra/mcp": "1.62.2",
+    "@geometra/mcp": "1.62.3",
     "playwright": "^1.58.1"
   },
   "devDependencies": {

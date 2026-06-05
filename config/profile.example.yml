@@ -87,23 +87,25 @@ location_constraints:
   requires_visa_sponsorship: false     # true → roles in non-authorized countries are blocked unless
                                        # the JD explicitly mentions visa sponsorship
 
-# Optional outbound proxy for the stealth Chromium that Geometra MCP spawns.
-# Uncomment and fill in to route ALL browser traffic through a residential /
-# mobile / SOCKS proxy you already pay for. Bypasses the datacenter-IP
-# fingerprinting that drives ~80-90% of Ashby / Lever / Cloudflare-fronted
-# "flagged as possible spam" submit failures in headless mode. JobForge passes
-# `headless: true` and `stealth: true` by default so Geometra MCP >= 1.61.3
-# launches CloakBrowser's patched Chromium for portal sessions without opening
-# visible browser windows.
+# Optional outbound proxy for Geometra browser sessions.
+# Uncomment and fill in to route browser traffic through a proxy you already
+# control. JobForge never bundles proxy bandwidth and never prints these values
+# in prompts or status text. JobForge passes `headless: true`,
+# `browserMode: "stock"`, `blockDetection: true`, and
+# `blockedSitePolicy: "manual-handoff"` by default so Geometra MCP >= 1.62.3
+# keeps browser windows hidden and returns structured `blockedSite` metadata
+# when a portal serves a challenge, CAPTCHA, access-denied page, or other
+# manual-review state.
 #
-# BYO — JobForge does NOT bundle or resell proxy bandwidth. Pick a residential
-# or mobile provider (Bright Data, Oxylabs, SOAX, Smartproxy, etc.), or a
-# mobile hotspot, or your own SOCKS relay. Required: Geometra MCP >= 1.61.3.
+# BYO — JobForge does NOT bundle or resell proxy bandwidth. Required:
+# Geometra MCP >= 1.62.3.
 #
 # When present, the apply / scan / auto-pipeline modes thread this into every
-# `geometra_connect` call as `proxy: {...}` alongside `headless: true` and
-# `stealth: true`. Pool is partitioned by proxy identity and stealth mode so
-# direct and proxied sessions never share a Chromium.
+# `geometra_connect` call as `proxy: {...}` alongside `headless: true`,
+# `browserMode: "stock"`, `blockDetection: true`, and
+# `blockedSitePolicy: "manual-handoff"`. Pooling is partitioned by proxy
+# identity and browser mode so direct and proxied sessions never share a
+# Chromium instance.
 #
 # proxy:
 #   server: "http://residential.example.com:8080"   # http://, https://, or socks5://

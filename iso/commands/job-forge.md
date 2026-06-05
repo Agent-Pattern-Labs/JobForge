@@ -234,7 +234,8 @@ Step 5  — Loop in rounds of 2 (Hard Limit #1)
     pair = candidates[round*2 : round*2 + 2]
     # If proxy is configured, do not paste proxy values into prompts.
     # Say: "Proxy is configured; read config/profile.yml and pass its
-    # top-level proxy object plus headless: true and stealth: true to every
+    # top-level proxy object plus headless: true, browserMode: "stock",
+    # blockDetection: true, and blockedSitePolicy: "manual-handoff" to every
     # Geometra connect or auto-connect call."
     # Dispatch 1 or 2 task() calls in ONE message (never 3+)
     task(subagent_type=<tier per AGENTS.md routing>, prompt=<apply prompt for pair[0]>)

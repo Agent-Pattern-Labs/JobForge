@@ -42,8 +42,8 @@ Live application assistant. Reads the active application form in Chrome (via Geo
 - [D6] Use `fieldLabel` over `fieldId` everywhere it works.
   why: labels are stable across DOM refreshes; IDs are regenerated
 
-- [D7] If the orchestrator says a proxy is configured, read the top-level `proxy:` block from `config/profile.yml` and pass that object plus `headless: true` and `stealth: true` into every `geometra_connect` call — including Call 3 of the recovery sequence — and every Geometra auto-connect call that passes `pageUrl` or `url`. If the task prompt includes a legacy inline `proxy` object, pass it through and still set `headless: true` and `stealth: true`, but do not echo credentials in status text. If absent, run with `headless: true`, `stealth: true`, and no proxy; never invent a proxy URL.
-  why: class-B Ashby / Cloudflare-fronted portals need a residential outbound IP plus a stealth Chromium fingerprint, and Geometra opens visible Chromium unless `headless: true` is explicit. Geometra MCP v1.59.0 added proxy plumbing, and v1.61.3 added CloakBrowser stealth Chromium via `stealth: true`; the orchestrator owns the config pipe. See "BYO Residential Proxy" in modes/reference-portals.md.
+- [D7] If the orchestrator says a proxy is configured, read the top-level `proxy:` block from `config/profile.yml` and pass that object plus `headless: true`, `browserMode: "stock"`, `blockDetection: true`, and `blockedSitePolicy: "manual-handoff"` into every `geometra_connect` call — including Call 3 of the recovery sequence — and every Geometra auto-connect call that passes `pageUrl` or `url`. If the task prompt includes a legacy inline `proxy` object, pass it through and still set the same headless/browser/block-detection options, but do not echo credentials in status text. If absent, run with `headless: true`, `browserMode: "stock"`, `blockDetection: true`, `blockedSitePolicy: "manual-handoff"`, and no proxy; never invent a proxy URL.
+  why: Geometra MCP >=1.62.3 keeps stock Chromium as the default browser mode, preserves headless operation when `headless: true` is explicit, and returns structured `blockedSite` / `manualHandoff` metadata for challenge, CAPTCHA, access-denied, and unsupported-browser states. JobForge should surface those states instead of silently looping on blocked portals. See "BYO Proxy + Block Detection" in modes/reference-portals.md.
 
 - [D8] Upgrade application routing to `@general-paid` when the offer score is ≥ 4.0/5, the user flags "top-tier", "dream job", or "high-stakes", or the candidate is late-stage/post-screen.
   why: high-stakes applications need the quality-sensitive prompt and medium reasoning budget even though OpenCode now routes both application tiers through DeepSeek V4 Flash by default
@@ -53,7 +53,7 @@ Live application assistant. Reads the active application form in Chrome (via Geo
 
 ## Procedure
 
-1. `geometra_connect`: `headless: true`, `stealth: true`, `isolated: true` [D7].
+1. `geometra_connect`: `headless: true`, `browserMode: "stock"`, `isolated: true`, `blockDetection: true`, `blockedSitePolicy: "manual-handoff"` [D7].
 2. Run `geometra_page_model`; do not WebFetch the URL [D5].
 3. If Geometra is unavailable, ask for screenshot or pasted text [D2].
 4. Extract company + role; Grep `reports/` for a matching evaluation.
@@ -356,7 +356,9 @@ Call 3:  geometra_connect({
            isolated: true,
            headless: true,
            slowMo: 350,
-           stealth: true,
+           browserMode: "stock",
+           blockDetection: true,
+           blockedSitePolicy: "manual-handoff",
            proxy: <pass through from task prompt if present; omit otherwise>
          })
 Call 4:  geometra_run_actions({

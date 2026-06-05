@@ -25,7 +25,7 @@ Read `portals.yml` which contains:
 
 ### Use Level 1 — Direct Geometra (PRIMARY)
 
-**For each company in `tracked_companies`:** Connect to its `careers_url` with Geometra MCP (`geometra_connect({ ..., headless: true, stealth: true })` + `geometra_page_model` / `geometra_list_items`), read ALL visible job listings, and extract the title + URL of each one. Direct Geometra is the most reliable method because:
+**For each company in `tracked_companies`:** Connect to its `careers_url` with Geometra MCP (`geometra_connect({ ..., headless: true, browserMode: "stock", blockDetection: true, blockedSitePolicy: "manual-handoff" })` + `geometra_page_model` / `geometra_list_items`), read ALL visible job listings, and extract the title + URL of each one. Direct Geometra is the most reliable method because:
 
 - It sees the page in real time (not cached Google results).
 - It works with SPAs (Ashby, Lever, Workday).
@@ -138,7 +138,7 @@ The levels are additive — all are executed, results are merged and deduplicate
 
 4. **Level 1 — Geometra scan** (sequential, or ≤2 parallel via `task` subagents per Hard Limit #1 in `AGENTS.md`):
    For each company in `tracked_companies` with `enabled: true` and `careers_url` defined:
-   a. `geometra_connect` to the `careers_url` with `headless: true` and `stealth: true`
+   a. `geometra_connect` to the `careers_url` with `headless: true`, `browserMode: "stock"`, `blockDetection: true`, and `blockedSitePolicy: "manual-handoff"`
    b. `geometra_page_model` or `geometra_list_items` to read all job listings
    c. If the page has filters/departments, navigate the relevant sections
    d. For each job listing extract: `{title, url, company}`
@@ -317,7 +317,7 @@ Each company in `tracked_companies` MUST have a `careers_url` — the direct URL
 **If `careers_url` doesn't exist** for a company:
 1. Try the pattern for its known platform
 2. If that fails, do a quick WebSearch: `"{company}" careers jobs`
-3. Navigate with Geometra (`geometra_connect` with `headless: true` and `stealth: true`) to confirm it works
+3. Navigate with Geometra (`geometra_connect` with `headless: true`, `browserMode: "stock"`, `blockDetection: true`, and `blockedSitePolicy: "manual-handoff"`) to confirm it works
 4. **Save the found URL in portals.yml** for future scans
 
 **If `careers_url` returns 404 or redirect:**

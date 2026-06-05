@@ -49,13 +49,13 @@ When a form says "enter the code we sent to your email", you MUST retrieve the c
 
 ---
 
-## BYO Residential Proxy + Stealth Chromium
+## BYO Proxy + Block Detection
 
-**Problem:** on 2026-04-19 cycle 4, 5/5 untested Ashby tenants and 100% of Dropbox-class Cloudflare-fronted portals fingerprint-blocked headless Chromium from datacenter IPs. `imeFriendly: true` fixes class A (React validation lag) but has zero effect on class B (environment fingerprint). There is no in-session software-only fix for class B: the server decided the session is a bot before the form response was rendered.
+**Problem:** Some portals return CAPTCHA, challenge, access-denied, unsupported-browser, rate-limit, or similar blocked states before a form can be read or submitted. `imeFriendly: true` fixes React validation lag, but it cannot change a server-side portal decision.
 
-**Fix:** route the spawned Chromium through a residential or mobile proxy the candidate already pays for, and launch Geometra's headless CloakBrowser stealth Chromium with `headless: true` and `stealth: true`. Geometra MCP v1.59.0 added a `proxy: { server, username?, password?, bypass? }` parameter on `geometra_connect` and `geometra_prepare_browser`; v1.61.3 added `stealth: true` for CloakBrowser. The outbound IP becomes residential/mobile, the browser fingerprint moves off stock Playwright Chromium, and the class-B checks have fewer signals to trip.
+**Default response:** JobForge keeps the browser hidden and predictable: pass `headless: true`, `browserMode: "stock"`, `blockDetection: true`, and `blockedSitePolicy: "manual-handoff"` on Geometra connects. Geometra MCP >=1.62.3 returns structured `blockedSite` and `manualHandoff` metadata so the orchestrator can record the block, stop retries, and ask for a manual path when needed.
 
-**Proxy is opt-in; headless and stealth are default.** JobForge does NOT bundle or resell proxy bandwidth — the candidate brings their own provider (Bright Data, Oxylabs, SOAX, Smartproxy, mobile hotspot, self-hosted SOCKS). Without a configured proxy, JobForge still passes `headless: true` and `stealth: true`, but the outbound IP remains the machine or hosting environment running Chromium.
+**Proxy is opt-in.** JobForge does NOT bundle or resell proxy bandwidth. If the candidate has their own proxy for legitimate network routing, JobForge can pass the top-level `proxy:` object through to Geometra without printing credentials. Without a configured proxy, JobForge omits the proxy parameter.
 
 ### Where the proxy config lives
 
@@ -76,33 +76,33 @@ See `config/profile.example.yml` for the commented-out template.
 **Orchestrator responsibilities:**
 
 1. On session start, read `config/profile.yml` once. If a `proxy:` block is present, remember that a proxy is configured, but do not paste username/password values into task prompts or user-visible status.
-2. When dispatching any subagent whose work involves a `geometra_connect` call or a Geometra auto-connect call with `pageUrl` / `url`, tell it to read `config/profile.yml` and pass the top-level `proxy:` block plus `headless: true` and `stealth: true` to every connect. Example dispatch prompt line: "Proxy is configured; read `config/profile.yml` and pass its top-level `proxy:` object plus `headless: true` and `stealth: true` to every Geometra connect or auto-connect call."
-3. When the orchestrator itself opens a Chromium session (single-application interactive flow), include the same `proxy` object from `config/profile.yml`, `headless: true`, and `stealth: true` in its own `geometra_connect` call.
+2. When dispatching any subagent whose work involves a `geometra_connect` call or a Geometra auto-connect call with `pageUrl` / `url`, tell it to read `config/profile.yml` and pass the top-level `proxy:` block plus `headless: true`, `browserMode: "stock"`, `blockDetection: true`, and `blockedSitePolicy: "manual-handoff"` to every connect. Example dispatch prompt line: "Proxy is configured; read `config/profile.yml` and pass its top-level `proxy:` object plus `headless: true`, `browserMode: \"stock\"`, `blockDetection: true`, and `blockedSitePolicy: \"manual-handoff\"` to every Geometra connect or auto-connect call."
+3. When the orchestrator itself opens a Chromium session (single-application interactive flow), include the same `proxy` object from `config/profile.yml`, `headless: true`, `browserMode: "stock"`, `blockDetection: true`, and `blockedSitePolicy: "manual-handoff"` in its own `geometra_connect` call.
 4. If `proxy:` is absent from `profile.yml`, skip the param entirely. Do NOT invent a proxy URL or leave a stale placeholder.
 
 **Subagent responsibilities:**
 
-1. If the task prompt says proxy is configured, read `config/profile.yml` and pass the top-level `proxy:` object plus `headless: true` and `stealth: true` through to `geometra_connect`, any Geometra auto-connect call with `pageUrl` / `url`, and any `geometra_prepare_browser` calls unchanged.
-2. If the task prompt includes a legacy inline `proxy` object, pass it through unchanged and still set `headless: true` and `stealth: true`, but never print the credentials back in status text.
-3. If the task prompt does NOT mention a proxy and `config/profile.yml` has no `proxy:` block, run with `headless: true`, `stealth: true`, and no proxy.
+1. If the task prompt says proxy is configured, read `config/profile.yml` and pass the top-level `proxy:` object plus `headless: true`, `browserMode: "stock"`, `blockDetection: true`, and `blockedSitePolicy: "manual-handoff"` through to `geometra_connect` and any Geometra auto-connect call with `pageUrl` / `url`. For `geometra_prepare_browser`, pass only the supported launch fields: `proxy`, `headless: true`, and `browserMode: "stock"`.
+2. If the task prompt includes a legacy inline `proxy` object, pass it through unchanged and still set the same headless/browser/block-detection options, but never print the credentials back in status text.
+3. If the task prompt does NOT mention a proxy and `config/profile.yml` has no `proxy:` block, run with `headless: true`, `browserMode: "stock"`, `blockDetection: true`, `blockedSitePolicy: "manual-handoff"`, and no proxy.
 4. Never second-guess the proxy field — if it comes from `profile.yml`, it's authoritative.
 
-### When proxy use is load-bearing
+### When blocked-site metadata is load-bearing
 
-Apply these rules when deciding whether the proxy is worth waiting for:
+Apply these rules when deciding whether to stop automation and hand off:
 
-- **Required** for known-block Ashby tenants (see the class-B list in the Ashby section above), for `happydance.website` / Cloudflare-fronted ATSes, and for any Lever tenant that previously failed in the class-B pattern.
-- **Recommended** for any Ashby tenant NOT on the class-A-compatible list (base rate prior: ~80-90% block headless).
-- **Optional** for Greenhouse, Workday, Lever-clean tenants — these accept datacenter IPs today; using the proxy adds ~100ms per frame but no material downside.
-- **Not useful** for Typeform (Geometra-unsupported), Avature native-select lag (not a fingerprint issue), JazzHR+reCAPTCHA (reCAPTCHA scores unrelated to IP), Breezy (tenant-configured per-IP throttle — proxy may help or may hit a fresh throttle).
+- **Stop immediately** when Geometra returns `blockedSite.detected: true` with `blockedSitePolicy: "manual-handoff"` and the page is a CAPTCHA, Cloudflare challenge, access-denied page, unsupported-browser page, or rate-limit notice.
+- **Retry once only** for Ashby text-field rejection when `invalidCount` suggested React validation lag; the retry must use `imeFriendly: true`. If the same spam/block message repeats after clean fills, stop.
+- **Do not spend time on Geometra-unsupported portals** such as Typeform or known native-select validation dead ends such as Avature. Mark Failed with the specific reason.
+- **Use a configured proxy only when it is already present in `profile.yml`.** Never invent a proxy, ask subagents to paste credentials, or print the configured values.
 
 ### Pool partitioning — why mixed runs are safe
 
-The Geometra MCP partitions its reusable-proxy pool by proxy identity and browser flavor — proxy partitioning landed in `@geometra/mcp@1.59.0`, and stealth partitioning is available in `@geometra/mcp@1.61.3`. A direct session and a proxied session NEVER share a Chromium instance, and stock and stealth sessions do not pool together. Practical consequence: flipping `proxy:` on or off in `profile.yml` mid-session is safe — the next `geometra_connect` just opens a fresh Chromium in its own pool partition.
+The Geometra MCP partitions its reusable-proxy pool by proxy identity and browser mode. A direct session and a proxied session NEVER share a Chromium instance, and stock and explicitly requested alternate browser modes do not pool together. Practical consequence: flipping `proxy:` on or off in `profile.yml` mid-session is safe — the next `geometra_connect` just opens a fresh Chromium in its own pool partition.
 
 ### Direct helper for one-shot reads
 
-Use `npx job-forge portal:snapshot --url "{url}" --json` or `npx job-forge portal:form-schema --url "{url}" --json` when you only need a rendered page model, compact snapshot, or form schema. These commands import Geometra's session module directly instead of going through MCP, enforce `headless: true`, `stealth: true`, and `isolated: true`, pass the `config/profile.yml` proxy block if configured, and close Chromium before exit. Keep MCP for interactive multi-step browser automation where a live `sessionId` must be driven across actions.
+Use `npx job-forge portal:snapshot --url "{url}" --json` or `npx job-forge portal:form-schema --url "{url}" --json` when you only need a rendered page model, compact snapshot, form schema, or `blockedSite` metadata from one URL. These commands import Geometra's session module directly instead of going through MCP, enforce `headless: true`, `browserMode: "stock"`, `blockDetection: true`, and `isolated: true`, pass the `config/profile.yml` proxy block if configured, and close Chromium before exit. Keep MCP for interactive multi-step browser automation where a live `sessionId` must be driven across actions.
 
 ### Troubleshooting
 
@@ -110,8 +110,9 @@ Use `npx job-forge portal:snapshot --url "{url}" --json` or `npx job-forge porta
 |---|---|
 | `Error: Failed to connect to proxy` immediately after `geometra_connect` | Proxy URL is wrong / unreachable. Verify the `server:` field hits the right host:port. |
 | `407 Proxy Authentication Required` | `username` or `password` is wrong or missing. Many residential providers require both. |
-| Class-B submit failure persists even with proxy set | (a) proxy is a datacenter proxy, not residential; (b) same tenant IP-banned your specific proxy's IP pool; (c) tenant uses TLS fingerprint / canvas fingerprint, not IP — switch to a fresh Chromium (isolated: true) and retry once, else mark Failed. |
-| Every `geometra_connect` is 3-5s slower than before | Expected — residential proxies add latency. Trade-off for higher submit-success rate. Do NOT revert unless the acceptance-rate lift is < 5%. |
+| `blockedSite.detected: true` on connect or page model | Stop automation for that URL, preserve the `blockedSite` payload, and route to manual handoff or mark Failed with the specific block type. |
+| Proxy is configured but pages fail immediately | Proxy URL/auth may be wrong, or the target site may reject the route. Verify the `server:` field locally; do not paste credentials into prompts. |
+| Every `geometra_connect` is 3-5s slower than before | Expected when a configured proxy adds network latency. Remove or adjust `proxy:` in `profile.yml` only if the candidate no longer wants that routing. |
 
 ---
 

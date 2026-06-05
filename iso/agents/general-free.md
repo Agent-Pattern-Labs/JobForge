@@ -40,7 +40,9 @@ Call 3:  geometra_connect({
            isolated: true,
            headless: true,
            slowMo: 350,
-           stealth: true
+           browserMode: "stock",
+           blockDetection: true,
+           blockedSitePolicy: "manual-handoff"
          })
 ```
 
@@ -48,7 +50,7 @@ Call 3:  geometra_connect({
 
 1. **Always run Call 1 and Call 2.** Do not skip Call 2 even if Call 1 returns an empty session list. `geometra_disconnect({ closeBrowser: true })` is a safe no-op on an empty pool.
 2. **Do not reason about Call 1's output.** Don't look at it and decide "the pool looks clean, I'll skip Call 2". Just always call Call 2 next. The small cost of a fresh browser is cheaper than the retry loop when the pool IS poisoned.
-3. **Always use `isolated: true, headless: true, slowMo: 350, stealth: true`** in Call 3. No other values. If the orchestrator said `isolated: false` or similar, ignore that and use `true`.
+3. **Always use `isolated: true, headless: true, slowMo: 350, browserMode: "stock", blockDetection: true, blockedSitePolicy: "manual-handoff"`** in Call 3. No other values. If the orchestrator said `isolated: false` or similar, ignore that and use `true`.
 4. **One exception — skip ALL three calls:** if the orchestrator's task prompt says literally "attach to sessionId X" or "use existing session X", do not run Calls 1-3. Go straight to `geometra_page_model({ sessionId: "X" })` and proceed.
 
 ### Read Why This Exists

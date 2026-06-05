@@ -21,7 +21,8 @@ Usage:
 Defaults are enforced in code for every browser launch:
   isolated: true
   headless: true
-  stealth: true
+  browserMode: stock
+  blockDetection: true
   slowMo: 350
 
 The helper imports Geometra's session module directly. It does not call the
@@ -66,6 +67,7 @@ async function snapshot(opts) {
     const pageModel = geometra.buildPageModel(root, {
       maxPrimaryActions: opts.maxPrimaryActions,
       maxSectionsPerKind: opts.maxSectionsPerKind,
+      blockDetection: true,
     });
     const compact = geometra.buildCompactUiIndex(root, {
       maxNodes: opts.maxNodes,
@@ -76,6 +78,7 @@ async function snapshot(opts) {
       url: opts.url,
       session: connectionSummary(session, proxy),
       defaults: launchDefaults(opts, proxy),
+      blockedSite: pageModel.blockedSite ?? { detected: false },
       pageModel,
       compact,
       ...(opts.forms ? { forms: geometra.buildFormSchemas(root, formOptions(opts)) } : {}),
@@ -83,8 +86,9 @@ async function snapshot(opts) {
     output(result, opts, () => {
       console.log(`url: ${opts.url}`);
       console.log(`session: ${session.id}`);
-      console.log(`defaults: isolated=true headless=true stealth=true slowMo=${opts.slowMo}`);
+      console.log(`defaults: ${formatDefaults(opts, proxy)}`);
       if (proxy) console.log(`proxy: ${redactProxy(proxy)}`);
+      printBlockedSite(pageModel);
       console.log(geometra.summarizePageModel(pageModel, 12));
       console.log(geometra.summarizeCompactIndex(compact.nodes, 24));
       if (opts.forms) {
@@ -104,18 +108,25 @@ async function formSchema(opts) {
 
   try {
     const root = buildRoot(geometra, session);
+    const pageModel = geometra.buildPageModel(root, {
+      maxPrimaryActions: opts.maxPrimaryActions,
+      maxSectionsPerKind: opts.maxSectionsPerKind,
+      blockDetection: true,
+    });
     const forms = geometra.buildFormSchemas(root, formOptions(opts));
     const result = {
       url: opts.url,
       session: connectionSummary(session, proxy),
       defaults: launchDefaults(opts, proxy),
+      blockedSite: pageModel.blockedSite ?? { detected: false },
       forms,
     };
     output(result, opts, () => {
       console.log(`url: ${opts.url}`);
       console.log(`session: ${session.id}`);
-      console.log(`defaults: isolated=true headless=true stealth=true slowMo=${opts.slowMo}`);
+      console.log(`defaults: ${formatDefaults(opts, proxy)}`);
       if (proxy) console.log(`proxy: ${redactProxy(proxy)}`);
+      printBlockedSite(pageModel);
       for (const form of forms) {
         const name = form.name ? ` "${form.name}"` : '';
         console.log(`${form.formId}${name}: ${form.fieldCount} fields, ${form.requiredCount} required, ${form.invalidCount} invalid`);
@@ -144,7 +155,7 @@ async function explain(opts) {
   output(result, opts, () => {
     console.log(`project: ${PROJECT_DIR}`);
     console.log(`module: ${moduleTarget.source} ${moduleTarget.path}`);
-    console.log(`defaults: isolated=true headless=true stealth=true slowMo=${opts.slowMo}`);
+    console.log(`defaults: ${formatDefaults(opts, proxy)}`);
     console.log(`profile proxy: ${proxy ? redactProxy(proxy) : 'none'}`);
   });
 }
@@ -154,7 +165,7 @@ async function connect(geometra, opts, proxy) {
     pageUrl: opts.url,
     isolated: true,
     headless: true,
-    stealth: true,
+    stealth: false,
     slowMo: opts.slowMo,
     width: opts.width,
     height: opts.height,
@@ -318,12 +329,31 @@ function launchDefaults(opts, proxy) {
   return {
     isolated: true,
     headless: true,
-    stealth: true,
+    browserMode: 'stock',
+    blockDetection: true,
     slowMo: opts.slowMo,
     width: opts.width,
     height: opts.height,
     profileProxy: Boolean(proxy),
   };
+}
+
+function formatDefaults(opts, proxy) {
+  const defaults = launchDefaults(opts, proxy);
+  return [
+    `isolated=${defaults.isolated}`,
+    `headless=${defaults.headless}`,
+    `browserMode=${defaults.browserMode}`,
+    `blockDetection=${defaults.blockDetection}`,
+    `slowMo=${defaults.slowMo}`,
+  ].join(' ');
+}
+
+function printBlockedSite(pageModel) {
+  if (!pageModel.blockedSite?.detected) return;
+  const type = pageModel.blockedSite.type ?? 'unknown';
+  const hint = pageModel.blockedSite.hint ? ` - ${pageModel.blockedSite.hint}` : '';
+  console.log(`blocked: ${type}${hint}`);
 }
 
 function connectionSummary(session, proxy) {

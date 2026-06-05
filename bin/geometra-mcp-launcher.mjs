@@ -5,7 +5,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DEFAULT_FALLBACK_PACKAGE = '@geometra/mcp@1.62.2';
+const DEFAULT_FALLBACK_PACKAGE = '@geometra/mcp@1.62.3';
 const RESOLVE_ONLY_FLAG = '--job-forge-resolve-target';
 const DEFAULT_LOG_RELATIVE_PATH = '.jobforge-mcp/geometra-mcp.jsonl';
 const DEFAULT_HEARTBEAT_MS = 15_000;

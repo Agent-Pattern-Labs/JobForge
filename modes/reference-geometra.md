@@ -40,7 +40,7 @@ These blocks come from two distinct root causes and require different responses:
 | Class | Root cause | Recoverable in-session? | Fix |
 |---|---|---|---|
 | **A. React-validation lag** | programmatic text input didn't fire composition events; React marks required fields internally missing even though values look correct | Yes | Refill with `imeFriendly: true` and resubmit once. |
-| **B. Environment fingerprint** | datacenter IP / VPN / headless Chromium signatures / browser-extension tells detected server-side | No (in headless) | Mark `Failed` with note "Ashby env-fingerprint"; recommend manual submit from user's own browser. |
+| **B. Server-side block** | portal rejects the session after inspecting network/browser/session signals | No (in headless) | Mark `Failed` with note "Ashby blocked session"; preserve `blockedSite` details when present and recommend manual submit from the user's own browser. |
 
 **How to tell them apart:** if you saw `invalidCount > 0` and the "required field" error BEFORE submit, class A is likely — retry with `imeFriendly: true`. If the form filled perfectly clean (`invalidCount: 0` on every step) and the spam flag fires only on submit, class B is likely — Ashby's "Learn more" dialog cites VPN/proxy, ad blockers, shared/public network, which `imeFriendly` cannot influence.
 
@@ -50,7 +50,7 @@ These blocks come from two distinct root causes and require different responses:
 
 **Rule — do NOT loop retrying a class B block.** One retry with `imeFriendly: true` is the correct test for class A. If the same spam message fires after a clean `imeFriendly` refill, stop, mark Failed, move on. Repeated retries waste subagent time and do not change the outcome.
 
-**Class B fix — BYO residential proxy + headless stealth Chromium.** When the candidate has configured `proxy:` in `config/profile.yml`, every `geometra_connect` call threads that proxy through to Chromium, which flips the outbound IP from datacenter to residential/mobile. JobForge also passes `headless: true` and `stealth: true` so Geometra MCP runs without opening a visible browser and Geometra MCP >=1.61.3 launches CloakBrowser's patched Chromium instead of stock Playwright Chromium. See the "BYO Residential Proxy" reference section below. Without a configured proxy, stealth still helps browser fingerprinting, but the outbound IP remains datacenter.
+**Class B response — structured block detection + manual handoff.** JobForge passes `headless: true`, `browserMode: "stock"`, `blockDetection: true`, and `blockedSitePolicy: "manual-handoff"` so Geometra MCP >=1.62.3 keeps browser windows hidden and returns structured `blockedSite` metadata when the portal serves a challenge, CAPTCHA, access-denied page, unsupported-browser screen, or similar block. If the same spam/block message fires after a clean `imeFriendly` retry, stop, record the failed outcome, and surface the `blockedSite` / `manualHandoff` detail to the orchestrator.
 
 **Known-block Ashby tenants (2026-04-19 empirical observations).** These tenants fired class B on every attempted submit from a headless datacenter-IP proxy. Orchestrators planning apply dispatches should assume these tenants will Fail in headless — prioritize other portals, or skip same-tenant siblings after a confirmed class B to avoid burning subagent slots:
 
@@ -60,7 +60,7 @@ These blocks come from two distinct root causes and require different responses:
 
 - Supabase, LangChain, Poolside, Runway Financial, Sentry, Cognition
 
-**Base rate for untested Ashby tenants (5/5 tested 2026-04-19 cycle 4 = class B).** The prior today is ~80-90% of untested Ashby tenants fingerprint-block headless submits. Orchestrators should treat any tenant not on the class-A-compatible list as likely class B — still dispatch to collect the data point, but don't burn multiple sibling-role slots on the same Ashby tenant.
+**Base rate for untested Ashby tenants (5/5 tested 2026-04-19 cycle 4 = class B).** Treat any tenant not on the class-A-compatible list as higher-risk for server-side submit blocks — still dispatch to collect the data point, but don't burn multiple sibling-role slots on the same Ashby tenant after one confirmed block.
 
 The pattern is tenant configuration, not role or company size. Lists drift as tenants tune their anti-bot — treat as probabilistic priors, not hard rules.
 
@@ -72,7 +72,7 @@ The pattern is tenant configuration, not role or company size. Lists drift as te
 
 **Avature multi-step wizards have a native-`<select>` validation lag (Bloomberg pattern).** Bloomberg's careers site redirects to `bloomberg.avature.net` with a 4-step wizard. On Step 2, native `<select>` elements ("Is Current Position? / No") accept the value but keep `invalid: true` persistently — neither Tab, re-submit, nor re-pick clears it. `imeFriendly` has no effect because the field is a native `<select>`, not React-controlled text. There is no documented recovery. Mark `Failed` with reason "Avature native-select validation lag"; account creation up to that point is preserved for any future manual path. Confirmed on Bloomberg Sr SWE Auth #828, 2026-04-19.
 
-**Cloudflare / ATS-vendor blocks on Dropbox-class portals.** Dropbox's real apply flow lives behind `happydance.website` (ATS vendor), which Cloudflare-fingerprints headless Chromium + datacenter IPs and returns "Sorry, you have been blocked". `job-boards.greenhouse.io/dropbox` does not mirror — there is no public Greenhouse fallback. Symptom-wise indistinguishable from Ashby class B but at a different layer. Mark `Failed` with reason "ATS vendor Cloudflare block (happydance.website or equivalent)". Confirmed on Dropbox Sr FS Product #831, 2026-04-19.
+**Cloudflare / ATS-vendor blocks on Dropbox-class portals.** Dropbox's real apply flow lives behind `happydance.website` (ATS vendor), which can return "Sorry, you have been blocked" before the form renders. `job-boards.greenhouse.io/dropbox` does not mirror — there is no public Greenhouse fallback. Symptom-wise indistinguishable from Ashby class B but at a different layer. Mark `Failed` with reason "ATS vendor Cloudflare block (happydance.website or equivalent)" and preserve `blockedSite` details when present. Confirmed on Dropbox Sr FS Product #831, 2026-04-19.
 
 **Greenhouse OTP-on-fill variant (Instacart pattern).** Most Greenhouse OTP flows fire on Submit. A minority (Instacart Staff FoodStorm #827, 2026-04-19) fire the 8-cell security-code gate mid-fill, BEFORE the user clicks Submit. Detection: watch for an 8-cell OTP input surfacing after resume upload or the first listbox commit. Fetch from Gmail (`from:greenhouse newer_than:10m`) immediately when it appears — do not wait for Submit.
 
@@ -80,7 +80,7 @@ The pattern is tenant configuration, not role or company size. Lists drift as te
 
 **Breezy portal — tenant-dependent, native `<select>`, resume-auto-parse is primary.** A subset of companies (Avantos AI, Courted, Instinct Science confirmed 2026-04-19) host applications on `*.breezy.hr` or `applytojob.com`. Empirical rules:
 
-- **Class is per-tenant, not uniform.** Avantos (Failed 2026-04-19 #854) returned Breezy's own "It looks like maybe you've already applied to this job?" banner from IP fingerprinting, even on a first submit — distinct failure mode from Ashby's "flagged as possible spam". Courted (Applied 2026-04-19 #855) went through cleanly on the same session. Don't pre-skip Breezy; the outcome is tenant-specific.
+- **Class is per-tenant, not uniform.** Avantos (Failed 2026-04-19 #854) returned Breezy's own "It looks like maybe you've already applied to this job?" banner on a first submit — distinct failure mode from Ashby's "flagged as possible spam". Courted (Applied 2026-04-19 #855) went through cleanly on the same session. Don't pre-skip Breezy; the outcome is tenant-specific.
 - **Native `<select>` elements, not React comboboxes.** `geometra_pick_listbox_option` sets the visible display but NOT the underlying form state — submit will fail with "A response is required" on every combobox. Use `geometra_select_option` with x,y + label value for every choice field on Breezy.
 - **Resume-auto-parse carries the signal.** After resume upload, Breezy auto-parses work history and education into structured rows. Do NOT Add/Delete position rows via Geometra — row mutations reshuffle fieldIds mid-flow, sequential `fill_fields` calls land in wrong rows, and upstream pollution corrupts earlier positions. Trust the parsed resume and fill only Personal Details + salary.
 
@@ -138,12 +138,20 @@ When running multiple application forms in parallel, each `geometra_connect` MUS
 
 **Correct parallel pattern:**
 ```javascript
-geometra_connect({ pageUrl: "https://...", isolated: true, headless: true, slowMo: 350, stealth: true })
+geometra_connect({
+  pageUrl: "https://...",
+  isolated: true,
+  headless: true,
+  slowMo: 350,
+  browserMode: "stock",
+  blockDetection: true,
+  blockedSitePolicy: "manual-handoff"
+})
 ```
 
 **Wrong:** running `geometra_connect` without `isolated: true` when submitting multiple forms concurrently. The forms may share state and produce incorrect submissions.
 
-**With a configured proxy,** add `proxy: { server, username?, password?, bypass? }` to the same call — see "BYO Residential Proxy" below. The reusable-proxy pool is partitioned by proxy identity, so mixing direct and proxied sessions across parallel rounds is safe. Keep `headless: true` and `stealth: true` either way so JobForge uses Geometra's CloakBrowser Chromium path for portal sessions without opening visible windows.
+**With a configured proxy,** add `proxy: { server, username?, password?, bypass? }` to the same call — see "BYO Proxy + Block Detection" below. The reusable-proxy pool is partitioned by proxy identity, so mixing direct and proxied sessions across parallel rounds is safe. Keep `headless: true`, `browserMode: "stock"`, `blockDetection: true`, and `blockedSitePolicy: "manual-handoff"` either way so JobForge keeps browser windows hidden and surfaces structured blocked-site states.
 
 ### Session Reuse — When Subagents Cannot Reach Existing Sessions
 
@@ -187,7 +195,7 @@ Every subagent that uses Geometra must run these THREE tool calls as its FIRST t
 ```
 Step 1:  geometra_list_sessions()
 Step 2:  geometra_disconnect({ closeBrowser: true })
-Step 3:  geometra_connect({ pageUrl: "<the URL the orchestrator gave you>", isolated: true, headless: true, slowMo: 350, stealth: true })
+Step 3:  geometra_connect({ pageUrl: "<the URL the orchestrator gave you>", isolated: true, headless: true, slowMo: 350, browserMode: "stock", blockDetection: true, blockedSitePolicy: "manual-handoff" })
 ```
 
 **If the orchestrator says proxy is configured,** read the top-level
@@ -195,12 +203,13 @@ Step 3:  geometra_connect({ pageUrl: "<the URL the orchestrator gave you>", isol
 
 ```
 Step 3:  geometra_connect({
-           pageUrl: "<URL>", isolated: true, headless: true, slowMo: 350, stealth: true,
+           pageUrl: "<URL>", isolated: true, headless: true, slowMo: 350,
+           browserMode: "stock", blockDetection: true, blockedSitePolicy: "manual-handoff",
            proxy: { server: "...", username: "...", password: "...", bypass: "..." }
          })
 ```
 
-Pass the proxy object through unchanged. Do NOT paraphrase or drop fields — `username`/`password`/`bypass` are optional, so only include what exists in `config/profile.yml`. Do not echo proxy credentials in status text. See the "BYO Residential Proxy" reference section for the why.
+Pass the proxy object through unchanged. Do NOT paraphrase or drop fields — `username`/`password`/`bypass` are optional, so only include what exists in `config/profile.yml`. Do not echo proxy credentials in status text. See the "BYO Proxy + Block Detection" reference section for the why.
 
 **DO NOT** skip Step 1 or Step 2. **DO NOT** think about whether it's needed. **DO NOT** look at `geometra_list_sessions` output and reason about it — just always call `geometra_disconnect({ closeBrowser: true })` next. The disconnect is a no-op if the pool is empty, and a poison-cure if it isn't.
 
